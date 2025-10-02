@@ -3,21 +3,16 @@
   <xacro:arg name="laser_visual"  default="true" />
   <xacro:arg name="camera_visual" default="true"/>
   <xacro:arg name="imu_visual"    default="false"/>
-  <xacro:arg name="robot_name" default="fella"/>
-
-  <xacro:property name="robot_name" value="$(arg robot_name)"/>
-  <xacro:property name="topic_prefix" value="$(arg robot_name)/"/>
 
   <xacro:include filename="$(find unomas)/urdf/wheel.urdf.xacro"/>
 
-  <!-- IMU Sensor -->
-  <gazebo reference="${robot_name}_imu_link">
+  <gazebo reference="imu_link">
     <sensor type="imu" name="imu">
       <always_on>true</always_on>
       <visualize>$(arg imu_visual)</visualize>
       <update_rate>100</update_rate>
-      <topic>${topic_prefix}imu</topic>
-      <gz_frame_id>${robot_name}_imu_link</gz_frame_id>
+      <topic>imu</topic>
+      <gz_frame_id>imu_link</gz_frame_id>
       <imu>
         <angular_velocity>
           <x>
@@ -79,46 +74,52 @@
     </sensor>
     <material>Gazebo/Grey</material>
   </gazebo>
-
-  <!-- Velocity Control -->
+ 
+  <!-- Move base directly without faffing around with diff drive controllers -->
   <gazebo>
     <plugin
       filename="ignition-gazebo-velocity-control-system"
       name="ignition::gazebo::systems::VelocityControl">
-      <topic>${topic_prefix}cmd_vel</topic>
+      <topic>cmd_vel</topic>
     </plugin>
   </gazebo>
 
-  <!-- Odometry -->
+  <!-- Publish odometry separately -->
   <gazebo>
     <plugin
       filename="ignition-gazebo-odometry-publisher-system"
       name="ignition::gazebo::systems::OdometryPublisher">
-      <topic>${topic_prefix}odom</topic>
+      <topic>odom</topic>
       <odom_publish_frequency>20</odom_publish_frequency>
-      <odom_frame>${robot_name}_odom</odom_frame>
-      <robot_base_frame>${robot_name}_base_link</robot_base_frame>
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
     </plugin>
   </gazebo>
 
-  <!-- Joint States -->
   <gazebo>
     <plugin
       filename="ignition-gazebo-joint-state-publisher-system"
       name="ignition::gazebo::systems::JointStatePublisher">
-      <topic>${topic_prefix}joint_states</topic>
+      <topic>joint_states</topic>
     </plugin>
   </gazebo>
 
-  <!-- Lidar -->
-  <gazebo reference="${robot_name}_base_scan">
+  <!-- Lidar and cameras use the general Sensors plugin -->
+  <gazebo>
+    <plugin
+        filename="libignition-gazebo-sensors-system.so"
+        name="ignition::gazebo::systems::Sensors">
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="base_scan">
     <material>Gazebo/FlatBlack</material>
     <sensor type="gpu_lidar" name="lidar">
-      <pose relative_to='${robot_name}_base_scan'>0 0 0 0 0 0</pose>
+      <pose relative_to='base_scan'>0 0 0 0 0 0</pose>
       <visualize>$(arg laser_visual)</visualize>
-      <topic>${topic_prefix}scan</topic>
+      <topic>scan</topic>
       <update_rate>3</update_rate>
-      <gz_frame_id>${robot_name}_base_scan</gz_frame_id>
+      <gz_frame_id>base_scan</gz_frame_id>
       <ray>
         <scan>
           <horizontal>
@@ -143,8 +144,7 @@
     </sensor>
   </gazebo>
 
-  <!-- Camera -->
-  <gazebo reference="${robot_name}_camera_link">
+  <gazebo reference="camera_link">
     <sensor name="rgbd_camera" type="rgbd_camera">
       <camera>
         <horizontal_fov>2.0944</horizontal_fov>
@@ -156,6 +156,13 @@
           <near>0.1</near>
           <far>40</far>
         </clip>
+        <!-- depth_camera near/far clip seems to be ignored for some reason -->
+        <!--    We're using Ignition Gazebo Fortress, which uses sdf format 1.9: http://sdformat.org/tutorials?tut=roadmap -->
+        <!--    This takes the depth_camera parameter with near / far clip http://sdformat.org/spec?ver=1.4&elem=sensor  -->
+        <!-- We also use ign sensors v6 ( run ls | grep libignition-sensors in /usr/lib/x86_64-linux-gnu)-->
+        <!-- Looking at the source code, the sdf sets HasDepthCamera() and corresponding HasDepthNearClip() & HasDepthFarClip() which are used in RgbdCameraSensor.cc, so this should work? -->
+        <!--    SDF description of Camera: https://github.com/gazebosim/sdformat/blob/sdf9/src/Camera.cc#L598-->
+        <!--    Camera sensor source code: https://github.com/gazebosim/gz-sensors/blob/ign-sensors6/src/RgbdCameraSensor.cc#L311  -->
         <depth_camera>
           <clip>
             <near>0.4</near>
@@ -164,10 +171,10 @@
         </depth_camera>
       </camera>
       <always_on>1</always_on>
-      <update_rate>3</update_rate>
+      <update_rate>3</update_rate> <!--10-->
       <visualize>$(arg camera_visual)</visualize>
-      <topic>${topic_prefix}camera</topic>
-      <gz_frame_id>${robot_name}_camera_link</gz_frame_id>
+      <topic>camera</topic>
+      <gz_frame_id>camera_link</gz_frame_id>
     </sensor>
   </gazebo>
 

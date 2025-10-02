@@ -1,11 +1,14 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="wheel">
   <!-- Properties -->
+  <xacro:arg name="robot_name" default="fella"/>
+  <xacro:property name="robot_name" value="$(arg robot_name)"/>
+
   <xacro:property name="wheel_separation" value="0.5708"/>
   <xacro:property name="wheel_radius" value="0.1651"/>
 
   <xacro:macro name="wheel" params="wheel_id x_pos y_pos">
-    <link name="${wheel_id}_wheel_link">
+    <link name="${robot_name}_${wheel_id}_wheel_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
@@ -31,9 +34,9 @@
     </link>
 
     <!-- Add joint to main body -->
-    <joint name="${wheel_id}_wheel_joint" type="revolute">
-      <parent link="base_link"/>
-      <child link="${wheel_id}_wheel_link" />
+    <joint name="${robot_name}_${wheel_id}_wheel_joint" type="revolute">
+      <parent link="${robot_name}_base_link"/>
+      <child link="${robot_name}_${wheel_id}_wheel_link" />
       <origin xyz="${x_pos} ${y_pos} 0.03282" rpy="0 0 0"/>
       <limit lower="-1e+16" upper="1e+16" effort="1e+16" velocity="1e+16"/>
       <axis xyz="0 1 0"/>

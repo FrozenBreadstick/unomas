@@ -6,64 +6,64 @@
   direction: GZ_TO_ROS
 
 # Position of joints [ie. wheels] (published by ignition::gazebo::systems::JointStatePublisher)
-- ros_topic_name: '/joint_states'
-  gz_topic_name: '/fella/joint_states'
+- ros_topic_name: '/{ROBOTNAME}/joint_states'
+  gz_topic_name: '/{ROBOTNAME}/joint_states'
   ros_type_name: 'sensor_msgs/msg/JointState'
   gz_type_name: 'ignition.msgs.Model'
   direction: GZ_TO_ROS
 
 # # Odometry (published by ignition::gazebo::systems::OdometryPublisher)
-- ros_topic_name: '/odometry'
-  gz_topic_name: '/fella/odometry'
+- ros_topic_name: '/{ROBOTNAME}/odom'
+  gz_topic_name: '/{ROBOTNAME}/odom'
   ros_type_name: 'nav_msgs/msg/Odometry'
-  gz_type_name: 'ignition.msgs.Odometry'
+  gz_type_name: 'gz.msgs.OdometryWithCovariance'
   direction: GZ_TO_ROS
 
 # Intertial Measurement Unit
-- ros_topic_name: '/imu'
-  gz_topic_name: '/fella/imu'
+- ros_topic_name: '/{ROBOTNAME}/imu'
+  gz_topic_name: '/{ROBOTNAME}/imu'
   ros_type_name: 'sensor_msgs/msg/Imu'
   gz_type_name: 'ignition.msgs.IMU'
   direction: GZ_TO_ROS
 
 # Command velocity
-- ros_topic_name: '/cmd_vel'
-  gz_topic_name: '/fella/cmd_vel'
+- ros_topic_name: '/{ROBOTNAME}/cmd_vel'
+  gz_topic_name: '/{ROBOTNAME}/cmd_vel'
   ros_type_name: 'geometry_msgs/msg/Twist'
   gz_type_name: 'ignition.msgs.Twist'
   direction: ROS_TO_GZ
 
 # Lidar: laserscan
-- ros_topic_name: "/scan"
-  gz_topic_name: "/fella/scan"
+- ros_topic_name: "/{ROBOTNAME}/scan"
+  gz_topic_name: "/{ROBOTNAME}/scan"
   ros_type_name: "sensor_msgs/msg/LaserScan"
-  gz_type_name: "gz.msgs.LaserScan"
+  gz_type_name: "ignition.msgs.LaserScan"
   direction: GZ_TO_ROS
 
 # Lidar: pointcloud
-- ros_topic_name: "/scan/points"
-  gz_topic_name: "/fella/scan/points"
+- ros_topic_name: "/{ROBOTNAME}/scan/points"
+  gz_topic_name: "/{ROBOTNAME}/scan/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   gz_type_name: "gz.msgs.PointCloudPacked"
   direction: GZ_TO_ROS
 
 # Camera: RGB
-- ros_topic_name: "/camera/image"
-  gz_topic_name: "/fella/camera/image"
+- ros_topic_name: "/{ROBOTNAME}/camera/image"
+  gz_topic_name: "/{ROBOTNAME}/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
 # Camera: depth
-- ros_topic_name: "/camera/depth/image"
-  gz_topic_name: "/fella/camera/depth_image"
+- ros_topic_name: "/{ROBOTNAME}/camera/depth/image"
+  gz_topic_name: "/{ROBOTNAME}/camera/depth_image"
   ros_type_name: "sensor_msgs/msg/Image"
   gz_type_name: "ignition.msgs.Image"
   direction: GZ_TO_ROS
 
 # Camera: depth pointcloud
-- ros_topic_name: "/camera/depth/points"
-  gz_topic_name: "/fella/camera/points"
+- ros_topic_name: "/{ROBOTNAME}/camera/depth/points"
+  gz_topic_name: "/{ROBOTNAME}/camera/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   gz_type_name: "ignition.msgs.PointCloudPacked"
   direction: GZ_TO_ROS
