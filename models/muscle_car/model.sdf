@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="muscle_car">
+    <static>true</static>
+    <link name="muscle_car_link">
+      <collision name="muscle_car_collision">
+        <geometry>
+          <mesh>
+            <uri>model://muscle_car/muscle_car.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="muscle_car_visual">
+        <geometry>
+          <mesh>
+            <uri>model://muscle_car/muscle_car.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

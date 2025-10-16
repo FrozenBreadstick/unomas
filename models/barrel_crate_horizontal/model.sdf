@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="barrel_crate">
+    <static>true</static>
+    <link name="barrel_crate_link">
+      <collision name="barrel_crate_collision">
+        <geometry>
+          <mesh>
+            <uri>model://barrel_crate_horizontal/barrel_crate.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="barrel_crate_visual">
+        <geometry>
+          <mesh>
+            <uri>model://barrel_crate_horizontal/barrel_crate.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

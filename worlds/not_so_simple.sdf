@@ -1,0 +1,522 @@
+<?xml version="1.0"?>
+<sdf version='1.8'>
+  <world name="not_so_simple_trees">
+    <!-- Basic world setup  -->
+    <plugin name='ignition::gazebo::systems::Physics' filename='ignition-gazebo-physics-system' />
+    <plugin name='ignition::gazebo::systems::UserCommands' filename='ignition-gazebo-user-commands-system' />
+    <plugin name='ignition::gazebo::systems::SceneBroadcaster' filename='ignition-gazebo-scene-broadcaster-system' />
+    <plugin name='ignition::gazebo::systems::Contact' filename='ignition-gazebo-contact-system' />
+    <light name="sun" type="directional">
+      <cast_shadows>1</cast_shadows>
+      <pose>0 0 10 0 -0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <gravity>0 0 -9.81</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <physics name="default_physics" type="ignored">
+      <max_step_size>0.01</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>100</real_time_update_rate>
+    </physics>
+    <scene>
+      <ambient>1.0 1.0 1.0</ambient>
+      <background>0.8 0.8 0.8</background>
+      <shadows>1</shadows>
+    </scene>
+
+    <!-- Initialise spherical coordinates somewhere -->
+    <spherical_coordinates>
+      <latitude_deg>0.0</latitude_deg>
+      <longitude_deg>0.0</longitude_deg>
+      <elevation>10.0</elevation>
+      <heading_deg>0</heading_deg>
+      <surface_model>EARTH_WGS84</surface_model>
+    </spherical_coordinates>
+
+    <!-- Small ground plane with grass texture -->
+    <include>
+      <uri>
+        model://grass_plane
+      </uri>
+      <name>grass_plane</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <!-- ===== Fields (north & east) ===== -->
+    <!-- Crop blocks rotated slightly for realism -->
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop1</name>
+      <pose>-15 50 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop2</name>
+      <pose>45 -45 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop3</name>
+      <pose>45 -10 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop4</name>
+      <pose>-50 50 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop5</name>
+      <pose>30 35 0 0 0 0.7854</pose>
+    </include>
+    <include>
+      <uri>model://crop_rows</uri>
+      <name>crop6</name>
+      <pose>-45 -45 0 0 0 -1.5818</pose>
+    </include>
+
+     <!-- ===== Natural clutter / obstacles ===== -->
+    <include>
+      <uri>model://rock1</uri>
+      <name>rock1</name>
+      <pose>39.2048 -37.5880 0 0 0 0.8318</pose>
+    </include>
+    <include>
+      <uri>model://rock2</uri>
+      <name>rock2</name>
+      <pose>13 13 0 0 0 -2.6555</pose>
+    </include>
+    <include>
+      <uri>model://rock2</uri>
+      <name>rock3</name>
+      <pose>-20.5000 -60.0000 0 0 0 0.4</pose>
+    </include>
+
+    <!-- ===== Farmstead (south-west quadrant) ===== -->
+    <include>
+      <uri>model://farm_house</uri>
+      <name>farm_house</name>
+      <pose>-10.5 -21.5 0 0 0 2.4848</pose>
+    </include>
+
+    <include>
+      <uri>model://farm_barn</uri>
+      <name>farm_barn</name>
+      <pose>-37 -3 0 0 0 1.2.5039</pose>
+    </include>
+
+    <include>
+      <uri>model://farm_loft</uri>
+      <name>farm_loft</name>
+      <pose>6 -38 0 0 0 0.8799</pose>
+    </include>
+
+    <!-- Yard props -->
+    <include>
+      <uri>model://shipping_container</uri>
+      <name>shipping_container1</name>
+      <pose>-61.5 -4.5 0 0 0 -0.947008</pose>
+    </include>
+    <include>
+      <uri>model://shipping_container</uri>
+      <name>shipping_container2</name>
+      <pose>-60 1.5 0 0 0 -0.696420</pose>
+    </include>
+
+    <include>
+      <uri>model://silo</uri>
+      <name>silo1</name>
+      <pose>-53 21 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://silo</uri>
+      <name>silo2</name>
+      <pose>-53 15.5 0 0 0 0</pose>
+    </include>
+
+    <!-- Tractors, tyres, crates near barn -->
+    <include>
+      <uri>model://tractor_old</uri>
+      <name>tractor_old</name>
+      <pose>-15 10 0 0 0 -1.2</pose>
+    </include>
+    <include>
+      <uri>model://tractor_new</uri>
+      <name>tractor_new</name>
+      <pose>-10 11 0 0 0 -0.3</pose>
+    </include>
+    <include>
+      <uri>model://tractor_tyre</uri>
+      <name>tractor_tyre_stack</name>
+      <pose>-7 13 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://small_crate</uri>
+      <name>small_crate</name>
+      <pose>-11.5 -13.5 0 0 0 0.5</pose>
+    </include>
+    <include>
+      <uri>model://barrel_crate</uri>
+      <name>barrel_crate</name>
+      <pose>-3 2 0 0 0 -0.2</pose>
+    </include>
+    <include>
+      <uri>model://barrel_crate_horizontal</uri>
+      <name>barrel_crate_2</name>
+      <pose>-5.5 3 0 0 0 1.0</pose>
+    </include>
+
+    <!-- Oak tree -->
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak1</name>
+      <pose>-4 -31 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak2</name>
+      <pose>2.5 -56 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak3</name>
+      <pose>0 -45 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak4</name>
+      <pose>11.5 -62.5 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak5</name>
+      <pose>22 -62.5 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak6</name>
+      <pose>12 -10 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak7</name>
+      <pose>60 13 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak8</name>
+      <pose>60 20 0 0 0 0</pose>
+    </include>
+    
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak9</name>
+      <pose>60 30 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak10</name>
+      <pose>18 60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak11</name>
+      <pose>-60 23 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak12</name>
+      <pose>-58.5 12 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
+      </uri>
+      <name>oak13</name>
+      <pose>-60 -11 0 0 0 0</pose>
+    </include>
+    
+    <!-- Pine tree -->
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine1</name>
+      <pose>-3.5 -14 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine2</name>
+      <pose>45 50 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine3</name>
+      <pose>50 50 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine4</name>
+      <pose>55 50 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine5</name>
+      <pose>60 50 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine6</name>
+      <pose>45 55 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine7</name>
+      <pose>50 55 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine8</name>
+      <pose>55 55 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine9</name>
+      <pose>60 55 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine10</name>
+      <pose>45 60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine11</name>
+      <pose>50 60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine12</name>
+      <pose>55 60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine13</name>
+      <pose>60 60 0 0 0 0</pose>
+    </include>
+    
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine14</name>
+      <pose>50 45 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine15</name>
+      <pose>55 45 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine16</name>
+      <pose>60 45 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine17</name>
+      <pose>55 40 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine18</name>
+      <pose>60 40 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine19</name>
+      <pose>60 35 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine20</name>
+      <pose>40 55 0 0 0 0</pose>
+    </include>
+    
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine21</name>
+      <pose>40 60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
+      </uri>
+      <name>pine22</name>
+      <pose>35 60 0 0 0 0</pose>
+    </include>
+    
+    <!-- Forest walls around perimeter to frame the scene -->
+    <include>
+      <uri>model://forest_wall</uri>
+      <name>forest_wall_north</name>
+      <pose>0 67.5 2 1.5708 0 0</pose>
+    </include>
+    <include>
+      <uri>model://forest_wall</uri>
+      <name>forest_wall_south</name>
+      <pose>0 -67.5 2 1.5708 0 0</pose>
+    </include>
+    <include>
+      <uri>model://forest_wall</uri>
+      <name>forest_wall_east</name>
+      <pose>67.5 0 2 1.5708 0 1.5708</pose>
+    </include>
+    <include>
+      <uri>model://forest_wall</uri>
+      <name>forest_wall_west</name>
+      <pose>-67.5 0 2 1.5708 0 1.5708</pose>
+    </include>
+
+
+    <!-- Optional driveway car -->
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car1</name>
+      <pose>1 -23 0 0 0 2.6</pose>
+    </include>
+
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car2</name>
+      <pose>8 -60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car3</name>
+      <pose>8 -57 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car4</name>
+      <pose>8 -54 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car5</name>
+      <pose>1 -60 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://muscle_car</uri>
+      <name>muscle_car6</name>
+      <pose>-33.1952 -0.8055 7.4569 1.9828 0.2028 -0.5197</pose>
+    </include>
+
+  </world>
+</sdf>

@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="rock2">
+    <static>true</static>
+    <link name="rock2_link">
+      <collision name="rock2_collision">
+        <geometry>
+          <mesh>
+            <uri>model://rock2/rock2.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="rock2_visual">
+        <geometry>
+          <mesh>
+            <uri>model://rock2/rock2.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

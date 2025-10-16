@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="tractor_new">
+    <static>true</static>
+    <link name="tractor_new_link">
+      <collision name="tractor_new_collision">
+        <geometry>
+          <mesh>
+            <uri>model://tractor_new/tractor_new.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="tractor_new_visual">
+        <geometry>
+          <mesh>
+            <uri>model://tractor_new/tractor_new.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

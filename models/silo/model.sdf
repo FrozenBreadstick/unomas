@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="silo">
+    <static>true</static>
+    <link name="silo_link">
+      <collision name="silo_collision">
+        <geometry>
+          <mesh>
+            <uri>model://silo/silo.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="silo_visual">
+        <geometry>
+          <mesh>
+            <uri>model://silo/silo.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
