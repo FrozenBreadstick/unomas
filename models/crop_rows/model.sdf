@@ -1,25 +1,23 @@
-<?xml version="1.0" ?>
-<sdf version="1.6">
+<sdf version="1.7">
   <model name="crop_rows">
     <static>true</static>
     <link name="crop_rows_link">
-      <visual name="crop_rows_visual">
-        <geometry>
-          <mesh>
-            <uri>model://crop_rows.dae</uri>
-            <scale>1 1 1</scale>
-          </mesh>
-        </geometry>
-      </visual>
       <collision name="crop_rows_collision">
         <geometry>
           <mesh>
-            <uri>model://crop_rows.dae</uri>
+            <uri>model://crop_rows/crop_rows.dae</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>
       </collision>
+      <visual name="crop_rows_visual">
+        <geometry>
+          <mesh>
+            <uri>model://crop_rows/crop_rows.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
     </link>
   </model>
 </sdf>
-
