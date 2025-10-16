@@ -13,8 +13,8 @@
   direction: GZ_TO_ROS
 
 # # Odometry (published by ignition::gazebo::systems::OdometryPublisher)
-- ros_topic_name: '/odometry'
-  gz_topic_name: '/fella/odometry'
+- ros_topic_name: '/odom'
+  gz_topic_name: '/odom'
   ros_type_name: 'nav_msgs/msg/Odometry'
   gz_type_name: 'ignition.msgs.Odometry'
   direction: GZ_TO_ROS
@@ -28,7 +28,7 @@
 
 # Command velocity
 - ros_topic_name: '/cmd_vel'
-  gz_topic_name: '/fella/cmd_vel'
+  gz_topic_name: '/cmd_vel'
   ros_type_name: 'geometry_msgs/msg/Twist'
   gz_type_name: 'ignition.msgs.Twist'
   direction: ROS_TO_GZ
@@ -36,6 +36,13 @@
 # Lidar: laserscan
 - ros_topic_name: "/scan"
   gz_topic_name: "/fella/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+# Secondary Lidar: secondary laserscan
+- ros_topic_name: "/secondary_scan"
+  gz_topic_name: "/fella/secondary_scan"
   ros_type_name: "sensor_msgs/msg/LaserScan"
   gz_type_name: "gz.msgs.LaserScan"
   direction: GZ_TO_ROS

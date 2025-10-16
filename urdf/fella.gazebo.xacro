@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot name="fella" xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:arg name="laser_visual"  default="true" />
+  <xacro:arg name="secondary_laser_visual" default="true" />
   <xacro:arg name="camera_visual" default="true"/>
   <xacro:arg name="imu_visual"    default="false"/>
 
@@ -80,7 +81,7 @@
     <plugin
       filename="ignition-gazebo-velocity-control-system"
       name="ignition::gazebo::systems::VelocityControl">
-      <topic>fella/cmd_vel</topic>
+      <topic>/cmd_vel</topic>
     </plugin>
   </gazebo>
 
@@ -89,7 +90,7 @@
     <plugin
       filename="ignition-gazebo-odometry-publisher-system"
       name="ignition::gazebo::systems::OdometryPublisher">
-      <topic>fella/odometry</topic>
+      <topic>/odom</topic>
       <odom_publish_frequency>20</odom_publish_frequency>
       <odom_frame>odom</odom_frame>
       <robot_base_frame>base_link</robot_base_frame>
@@ -118,6 +119,38 @@
       <pose relative_to='base_scan'>0 0 0 0 0 0</pose>
       <visualize>$(arg laser_visual)</visualize>
       <topic>fella/scan</topic>
+      <update_rate>3</update_rate>
+      <gz_frame_id>base_scan</gz_frame_id>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>0.0</min_angle>
+            <max_angle>6.28319</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.2</min>
+          <max>40</max>
+          <resolution>0.015</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </ray>
+      <always_on>true</always_on>
+    </sensor>
+  </gazebo>
+
+    <gazebo reference="secondary_base_scan">
+    <material>Gazebo/FlatBlack</material>
+    <sensor type="gpu_lidar" name="secondary_lidar">
+      <pose relative_to='base_scan'>0 0 0 0 0 0</pose>
+      <visualize>$(arg secondary_laser_visual)</visualize>
+      <topic>fella/secondary_scan</topic>
       <update_rate>3</update_rate>
       <gz_frame_id>base_scan</gz_frame_id>
       <ray>
