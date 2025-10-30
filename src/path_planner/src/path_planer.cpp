@@ -30,6 +30,8 @@ PathPlanner::PathPlanner(geometry_msgs::msg::PoseArray goals, geometry_msgs::msg
     // initialise subscribers
     goalsSub_ = this->create_subscription<geometry_msgs::msg::PoseArray>("/goals", 10, std::bind(&PathPlanner::subscribeGoals, this, std::placeholders::_1));
     obstaclesSub_ = this->create_subscription<custom_msgs::Obstacles>("/obstacles", 10, std::bind(&PathPlanner::subscribeObstacles, this, std::placeholders::_1));
+    groundLiDARSub_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/laserscan2", 10, std::bind(&PathPlanner::subscribeGroundLiDAR, this, std::placeholders::_1));
+
 
     // initialise wall timer for feedback pubs
     Timer_ = this->create_wall_timer(500ms, std::bind(&PathPlanner::timer_callback, this));
@@ -161,13 +163,25 @@ PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
 
 
 // subscriber callback that listens for obstacles from detection node
-PathPlanner::subscribeObstacles(custom_msgs::Obstacles obstacles)
+PathPlanner::subscribeObstacles(sensor_msgs::msg::LaserScan data)
 {
-    // lock mutex and save obstacles
+    // lock mutex and save data
+    {
+    std::lock_guard<std::mutex> lock(groundLiDAR_.groundLiDARMutex);
+    
+    groundLiDAR_.data = data;
+    }
+}
+
+
+// subscriber callback that listens for ground LiDAR
+PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
+{
+    // lock mutex and save laser data
     {
     std::lock_guard<std::mutex> lock(objects_.objectMutex);
     
-    objects_.objectPoints = obstacles;
+    objects_.groundLiDAR = laser;
     }
 }
 
@@ -300,6 +314,10 @@ std::vector<std::vector<geometry_msgs::msg::Point>> PathPlanner::determineObject
     return objects;
 }
 
+std::vector<geometry_msgs::msg::Point> PathPlanner::processLiDAR()
+{
+    // ...
+}
 
 // find the closest point on each object
 std::vector<geometry_msgs::msg::Point> PathPlanner::findClosestPoints(std::vector<std::vector<geometry_msgs::msg::Point>> objects)
@@ -449,7 +467,6 @@ PathPlanner::navThread()
         // do state actions
         switch(state_)
         {
-    
             // travelling to field guess
             case TRAVELLING:
 
@@ -511,8 +528,98 @@ PathPlanner::navThread()
 
                 break;
 
+            // surveying
+            case SURVEYING:
+
+
+
+
+
+                // move forward to row middle and turn to face down row (rotate 90 to the right)
+
+                // switch to sampling
+
+                switch(stateData_.surveyingState)
+                {
+                    // do a rotation and identify closest (starting row/current row) and second closest (next row) row centre to beacon
+                    case ROTATING:
+
+                        // if first loop grab initial bearing
+                        if(stateData_.changedState == true) {
+
+                            stateData_.changedState = false;
+
+                            stateData_.initSurveyingAngle = robotPose_.theta;
+                            stateData_.startedRotating = false;
+                        }
+                        else {
+                        
+                            // save points in crop centres if they are not already saved
+                            collectObjectPoints();
+
+                            // rotate robot
+                            geometry_msgs::msg::Twist vel;
+                            vel.angular.z = manualNavData_.rotate;
+                            cmdVelPub_->publish(vel);
+
+                            // check if robot has rotated enough
+                            if(robotPose_.theta - stateData_.initSurveyingAngle < 0.1) {
+                                
+                                // ensure it has started rotating
+                                if(stateData_.startedRotating == true) {
+
+                                    stateData_.surveyingState = CALCULATING;
+                                }
+                            }
+                            else {
+                                stateData_.startedRotating = true;
+                            }
+                        }
+
+                        break;
+
+                // calculate middle of row, calculate direction and distance to move to middle of row (i.e. direction of line, move half distance of line)
+                    case CALCULATING:
+
+                        // find closest 2 crop centres
+                        std::vector<geometry_msgs::msg::Point> crops = twoClosest(cropsData_.cropCentres); //alternatively use this to make a local copy of the var
+
+                        cropData_.currentCrop = crops.at(0);
+                        cropData_.nextCrop = crops.at(1);
+
+                        
+
+
+                        break;
+
+                    case MOVING:
+
+                        break;
+
+                    case EXITING:
+
+                        break;
+                }
+
+                break;
+
+
             // aligning
             case ALIGNING:
+
+                // save current row into "past rows" array, save "next row" into "current row"
+
+                // ID all row centres, remove row centres near already completed rows, find row centre closest to "current row" and save as next row
+
+                // find midpoint between "current row" and "next row", calculate direction and distance to move to midpoint
+                
+                // turn to direction of line, move forward, then turn 90 degrees to face down row (maybe a bool that gets toggled between left and right? (or -1 and 1))
+
+                // switch to sampling
+
+
+
+
 
                 // detect obstacles to detect the field rows
                 std::vector<geometry_msgs::msg::Point> crops = detectCrops(); //alternatively use this to make a local copy of the var
@@ -551,6 +658,24 @@ PathPlanner::navThread()
 
             // sampling
             case SAMPLING:
+
+                // determine if still in field by using the ground pointing LiDAR to detect the field rows (convert ground facing LiDAR points to see elevation in ground over a certian treshold)
+
+                // if still in field, then check if outside of sample range
+
+                    // if outside of sample range, then sample
+
+                    // else 
+                        // drive forward
+                
+                // else
+                    // drive forward and do a 180 rotation towards the field
+
+                    // move to allgining
+
+
+
+
 
                 if(stateData_.endSampling_ == false) {
 

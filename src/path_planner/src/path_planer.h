@@ -205,9 +205,10 @@ private:
     enum State
     {
         TRAVELLING,
+        SURVEYING,
         ALIGNING,
         SAMPLING,
-        WAITING,
+        IDLE,
         EMERGENCY
 
     } state_; //!< current state of the robot
@@ -228,9 +229,18 @@ private:
     {
         std::mutex objectMutex;
 
-        std::vector<geometry_msgs::msg::Point, std::string> objectPoints;   // laser scanned points, and the object they are part of (i.e. crop1, crop2) (could probably make an enum for this) (might need to be a custom message)
+        std::vector<geometry_msgs::msg::Point> objectPoints;   // laser scanned points, and the object they are part of (i.e. crop1, crop2) (could probably make an enum for this) (might need to be a custom message)
    
     } objects_; // vector of object points
+
+
+    struct groundLiDARData
+    {
+        std::mutex groundLiDARMutex;
+
+        sensor_msgs::msg::LaserScan data;
+
+    } groundLiDAR_; // vector of object points
  
 
     struct soilData
@@ -277,6 +287,7 @@ private:
     // functional subscribers
     rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr goalsSub_; //!< subscriber for goal poses
     rclcpp::Subscription<custom_msgs::Obstacles>::SharedPtr obstaclesSub_; //!< subscriber for obstacles
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr groundLiDARSub_; //!< subscriber for ground LiDAR
 
     struct threadData
     {
@@ -291,21 +302,58 @@ private:
     {
         const float rotate = 0.1;
         const float linear = 0.1;
+
     } vel_; //!< manuel nav data
 
 
     struct stateData
     {
+        // surveying
+        SurveyingState surveyingState;
+        double initSurveyingAngle;
+        bool startedRotating = false;
+
+        // sampling
         bool endSampling;
         int noCropsCounter;
         bool exitMove;
         unsigned double moveTimer;
-        bool changedState;
 
+        // aligning
+
+        // waiting
+
+        // emergency
+
+        // universal
+        bool changedState;
+        
     } stateData_;
+
     
+    enum SurveyingState
+    {
+        ROTATING,
+        CALCULATING,
+        MOVING,
+        EXITING
+    }
+
+
+    struct cropData
+    {
+        std::vector<geometry_msgs::msg::Point> cropCentres;
+
+        geometry_msgs::msg::Point currentCrop;
+        geometry_msgs::msg::Point nextCrop;
+
+        geometry_msgs::msg::Point rowCentre;
+
+    } cropData_;
 
     const float minDistObjects = 0.4; //!< minimum distance to distinguish consecutive points between objects
     const float minSampleDistance = 0.7;  //!< minimum distance between samples (also used to determine if allignment point is in already sampled row)
+
+
 
 }
