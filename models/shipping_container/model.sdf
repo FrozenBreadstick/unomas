@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="shipping_container">
+    <static>true</static>
+    <link name="shipping_container_link">
+      <collision name="shipping_container_collision">
+        <geometry>
+          <mesh>
+            <uri>model://shipping_container/shipping_container.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="shipping_container_visual">
+        <geometry>
+          <mesh>
+            <uri>model://shipping_container/shipping_container.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

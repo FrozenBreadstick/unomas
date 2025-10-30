@@ -68,6 +68,15 @@
       <name>pine1</name>
       <pose>5.0 0.0 0 0 0 0</pose>
     </include>
+    
+    <!-- Small ground plane with grass texture -->
+    <include>
+      <uri>
+        model://crop_rows
+      </uri>
+      <name>crop_rows</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
 
   </world>
 </sdf>

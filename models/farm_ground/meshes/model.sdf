@@ -1,0 +1,23 @@
+<sdf version="1.7">
+  <model name="farm_ground">
+    <static>true</static>
+    <link name="farm_ground_link">
+      <collision name="farm_ground_collision">
+        <geometry>
+          <mesh>
+            <uri>model://meshes/farm_ground.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="farm_ground_visual">
+        <geometry>
+          <mesh>
+            <uri>model://meshes/farm_ground.dae</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
