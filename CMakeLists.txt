@@ -10,6 +10,62 @@ find_package(ament_cmake REQUIRED)
 
 find_package(ros_ign_interfaces REQUIRED)
 
+find_package(geometry_msgs REQUIRED)
+
+find_package(rclcpp REQUIRED)
+
+
+# custom messages
+find_package(rosidl_default_generators REQUIRED)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/StrNum.msg"
+  "msg/StrStr.msg"
+  "msg/StatusUpdatePacket.msg"
+  "srv/DebugTrigger.srv"
+  "srv/DebugResponse.srv"
+  "srv/StatusUpdateService.srv"
+  DEPENDENCIES geometry_msgs
+)
+rosidl_get_typesupport_target(custom_messages ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
+# all node executables
+add_executable(base_station
+  src/base_station/base_station_main.cpp
+  src/base_station/base_station_status.cpp
+  src/base_station/base_station_register.cpp
+  src/base_station/base_station_terrain_soil.cpp
+  src/base_station/base_station_path.cpp
+)
+target_link_libraries(base_station
+  ${custom_messages}
+)
+ament_target_dependencies(base_station
+  rclcpp
+  geometry_msgs
+)
+
+
+add_executable(ui_bridge
+  src/ui/ros/ui_main.cpp
+  src/ui/ros/ui_bridge.cpp
+)
+target_link_libraries(ui_bridge
+  ${custom_messages}
+)
+ament_target_dependencies(ui_bridge
+  rclcpp
+)
+
+#install executables to lib
+install(
+  TARGETS 
+    base_station
+    ui_bridge
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+#install data files to share
 install(
   DIRECTORY config launch models urdf worlds
   DESTINATION share/${PROJECT_NAME}
@@ -19,5 +75,7 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_dependencies(rosidl_default_runtime)
 
 ament_package()
