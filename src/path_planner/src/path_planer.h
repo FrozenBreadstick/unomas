@@ -204,12 +204,27 @@ private:
 
     enum State
     {
+        // SUPER STATES
         TRAVELLING,
         SURVEYING,
         ALIGNING,
         SAMPLING,
         IDLE,
-        EMERGENCY
+        EMERGENCY,
+
+        // SURVEYING SUB STATES
+        ROTATING,
+        CALCULATING,
+        S_MOVING,
+        EXITING
+
+        // ALLIGNING SUB STATES
+        LEAVING,
+        TURNING,
+        A_MOVING,
+        ENTERING,
+        CHECKING
+    };
 
     } state_; //!< current state of the robot
     
@@ -247,7 +262,7 @@ private:
     {
         std::mutex soilMutex;
 
-        geometry_msgs::msg::Pose soilPose; // position of the soil
+        geometry_msgs::msg::Pose soilPose; // position of the last soil sample
         custom_msgs::SoilData soilData; // soil data
 
         std::vector<geometry_msgs::msg::Point> sampledPoints; // vector of points that have been sampled
@@ -309,36 +324,35 @@ private:
     struct stateData
     {
         // surveying
-        SurveyingState surveyingState;
+        State surveyingState;
         double initSurveyingAngle;
         bool startedRotating = false;
         bool rowAlligned = false;
 
         // sampling
-        bool endSampling;
-        int noCropsCounter;
-        bool exitMove;
-        unsigned double moveTimer;
+        double minSampleDistance = 1.0;
 
         // aligning
+        State aligningState;
+
 
         // waiting
 
         // emergency
 
         // universal
+        State superState;
         bool changedState;
         
     } stateData_;
 
-    
-    enum SurveyingState
+
+
+    enum class AligningState
     {
-        ROTATING,
-        CALCULATING,
-        MOVING,
-        EXITING
-    }
+
+    };
+
 
 
     struct cropData
@@ -354,6 +368,8 @@ private:
 
         geometry_msgs::msg::Point rowParallel;
         geometry_msgs::msg::Point rowPerpendicular;
+
+        double midRowScaler;
         geometry_msgs::msg::Point midRowVector;
 
     } cropData_;

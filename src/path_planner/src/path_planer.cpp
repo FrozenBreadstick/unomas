@@ -461,7 +461,7 @@ std::vector<geometry_msgs::msg::Pose> PathPlanner::getGoalData()
 PathPlanner::navThread()
 {
 
-    state_ = TRAVELLING;
+    stateData_.superState = TRAVELLING;
     feedbackData_.state = "TRAVELLING";
 
     while(threadData_.navDone == false)
@@ -470,9 +470,8 @@ PathPlanner::navThread()
         // get odo service call to base station
         // ... (ask mattia for advice) ...
 
-
         // do state actions
-        switch(state_)
+        switch(stateData_.superState)
         {
             // travelling to field guess
             case TRAVELLING:
@@ -538,14 +537,6 @@ PathPlanner::navThread()
             // surveying
             case SURVEYING:
 
-
-
-
-
-                // move forward to row middle and turn to face down row (rotate 90 to the right)
-
-                // switch to sampling
-
                 switch(stateData_.surveyingState)
                 {
                     // do a rotation and identify closest (starting row/current row) and second closest (next row) row centre to beacon
@@ -609,187 +600,164 @@ PathPlanner::navThread()
 
                         // calculate projection of crop row centre onto crop field perpendicular direction vector
                         geometry_msgs::msg::Point rowCentreProj = cropData_.rowCentre - dronePose_.position;
-                        double projScaler = rowCentreProj.x * cropData_.rowPerpendicular.x + rowCentreProj.y * cropData_.rowPerpendicular.y;
-                        cropData_.midRowVector.x = cropData_.rowPerpendicular.x * projScaler;
-                        cropData_.midRowVector.y = cropData_.rowPerpendicular.y * projScaler;
+                        cropData_.midRowScaler = rowCentreProj.x * cropData_.rowPerpendicular.x + rowCentreProj.y * cropData_.rowPerpendicular.y;
+                        cropData_.midRowVector.x = cropData_.rowPerpendicular.x * cropData_.midRowScaler;
+                        cropData_.midRowVector.y = cropData_.rowPerpendicular.y * cropData_.midRowScaler;
 
                         // change sub-state
                         stateData_.surveyingState = MOVING;
 
                         break;
+                    
+                    // move forward to row middle and turn to face down row (rotate 90 to the right)
+                    case S_MOVING:
+                        geometry_msgs::msg::Twist vel;
 
-                    case MOVING:
+                        if(stateData_.rowAlligned == false) {
+                            // calculate angle between rowPerpendicular and drone
+                            angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                            angle = correctAngle(angle);
+                            direction = angle / abs(angle);
 
-                        if(rowAlligned == false) {
-                            // face rowPerpendicular
+                            // calculate magnitude of distance from corner to drone
+                            distance = sqrt(pow(dronePose_.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.position.y - cropData_.rowCorner.y, 2));
+
+                            // check if drone is facing perp to row and close to mid row
+                            if(dronePose_.theta - angle > 0.1) {
+
+                                vel.angular = direction * manualNavData_.rotate;
+                            }
+                            else if(distance - cropData_.midRowScaler > 0.1) {
+                                vel.linear = manualNavData_.linear;
+                            }
+                            else {
+                                stateData_.rowAlligned = true;
+                            }
+                        }
+                        else {
+                            // calculate angle between rowParallel and drone
+                            angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            angle = correctAngle(angle);
+                            direction = angle / abs(angle);
+
+                            // check if drone is facing down row
+                            if(dronePose_.theta - angle > 0.1) {
+                                vel.angular = direction * manualNavData_.rotate;
+                            }
+                            else { 
+                                stateData_.surveyingState = EXITING;
+                            }
+                        }
+
+                        cmdVelPub_->publish(vel);
 
                         break;
 
+                    // switch to sampling
                     case EXITING:
+                        
+                        // reset state data
+                        stateData_.state = SAMPLING;
+                        stateData_.surveyingState = ROTATING;
+                        stateData_.changedState = true;
+                        stateData_.rowAlligned = false;
 
                         break;
                 }
 
                 break;
 
-
             // aligning
             case ALIGNING:
 
-                // save current row into "past rows" array, save "next row" into "current row"
+                if(stateData_.changedState == true) {
+                    stateData_.changedState = false;
+                    stateData_.aligningState = LEAVING;
+                }
+                else {
+                    switch(stateData_.aligningState)
+                    {
+                        case LEAVING:
+                        // go forward X
 
-                // ID all row centres, remove row centres near already completed rows, find row centre closest to "current row" and save as next row
+                            break;
 
-                // find midpoint between "current row" and "next row", calculate direction and distance to move to midpoint
-                
-                // turn to direction of line, move forward, then turn 90 degrees to face down row (maybe a bool that gets toggled between left and right? (or -1 and 1))
+                        case TURNING:
+                        // turn 90 degrees to the right or left
 
-                // switch to sampling
+                            break;
 
+                        // go forward X*2
+                        case A_MOVING:
 
+                            break;
 
+                        // go forward X*1.5
+                        case ENTERING:
 
-
-                // detect obstacles to detect the field rows
-                std::vector<geometry_msgs::msg::Point> crops = detectCrops(); //alternatively use this to make a local copy of the var
-
-                // calculate allginment position
-                std::vector<std::vector<geometry_msgs::msg::Point>> objects = determineObjects(crops);
-                std::vector<geometry_msgs::msg::Point> closestPoints = findClosestPoints(objects);
-                std::vector<geometry_msgs::msg::Point> twoClosestPoints = twoClosest(closestPoints);
-                geometry_msgs::msg::Point allignmentPoint = calculateAllignmentPoint(twoClosestPoints);
-
-                // check that allignment point is not in already sampled row
-                for(auto point : sampledPoints) {
-
-                    distance = sqrt(pow(point.x - allignmentPoint.x, 2) + pow(point.y - allignmentPoint.y, 2));
-                    if(distance < minSampleDistance) {
-                        RCLCPP_ERROR(this->get_logger(), "Error: Allignment point is in already sampled row");
+                            break;
                         
-                        // if allignment point is in already sampled row, then move to sampling
+                        // check if row exists
+                        case CHECKING:
+
+                            break;
                     }
                 }
-
-                // OPTION 1: Manual allignment
-                    // determine velocity to move to allignment position
-                    // publish to cmd_vel and moniter status
-                        // if cannot allign after X time move to emergency
-                
-                // OPTION 2: Automatic allignment
-                    // Publish to nav2 and moniter status
-                        // if Nav2 is stuck and not moving, then cancel and republish goal
-                            // if cannot reach goal after X time move to emergency
-                    
-                // if allignment is complete, then move to sampling
-
 
                 break;
 
             // sampling
             case SAMPLING:
 
-                // determine if still in field by using the ground pointing LiDAR to detect the field rows (convert ground facing LiDAR points to see elevation in ground over a certian treshold)
+                //make local copy of LiDAR data
 
-                // if still in field, then check if outside of sample range
-
-                    // if outside of sample range, then sample
-
-                    // else 
-                        // drive forward
-                
-                // else
-                    // drive forward and do a 180 rotation towards the field
-
-                    // move to allgining
-
-
-
-
-
-                if(stateData_.endSampling_ == false) {
-
-                    // find 2 closest points on each object
-                    std::vector<geometry_msgs::msg::Point> rawPoints = getRawObjectData(); //alternatively use this to make a local copy of the var
-                    std::vector<std::vector<geometry_msgs::msg::Point>> objects = determineObjects(rawPoints);
-                    std::vector<geometry_msgs::msg::Point> crops = findClosestPoints(objects);
-                    std::vector<geometry_msgs::msg::Point> twoClosestPoints = twoClosest(crops);
-
-                    // determine perpendicular allignment
-                    double paraAngle = atan2(twoClosestPoints.at(1).y - twoClosestPoints.at(0).y, twoClosestPoints.at(1).x - twoClosestPoints.at(0).x);
-                    double perpAngle = paraAngle + M_PI / 2;
-
-                    // calculate rotation needed to align with field
-                    double rotation = perpAngle - robotPose_.theta;
-                    rotation = correctAngle(rotation);
-
-                    // check parallel to field
-                    if(rotation > 0.1) {
-
-                        rotVel = rotation * vel_.rotate;
-
-                        // allign with field
-                        publishCmdVel(vel_.rotate);
-                    }
-                    else {
-                        // begin probing process
-                        bool sampleHere = true;
-
-                        for( point : sampledPoints) {
-
-                            distance = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
-
-                            if(distance > minSampleDistance) {
-                                // take sample
-                                sampleHere = false;
-                            }
-                        }
-
-                        if(sampleHere == true) {
-                            // sample location
-                            // ... service call to get sample ...
-                            // ... publish to soilData ...
-                        }
-                        else {
-                            // move forward slightly
-                            // ... publish to cmd_vel ...
-                        }
-                    }
-
-                    // determine if still in field
-                    std::vector<geometry_msgs::msg::Point> crops = detectCrops(); //alternatively use this to make a local copy of the var
-                    if(crops.size() == 0) {
-                        // count up and if counter reaches 10 then move forward  and rotate 180 degrees
-                        stateData_.noCropsCounter++;
-                        if(stateData_.noCropsCounter > 10) {
-                            stateData_.noCropsCounter = 0;
-                            stateData_.endSampling = true;
-                            stateData_.moveTimer = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                        }
-                        // then switch to alligning
-                    }
-                    else {
-                        stateData_.noCropsCounter = 0;
-                    }
+                // if just changed state
+                if(stateData_.changedState == true) {
+                    
+                    stateData_.changedState = false;
+                    
+                    // sample function
                 }
                 else {
-                    if(stateData_.exitMove == true) {
-                        // publish to cmd_vel to move forward
-                        // ... publish to cmd_vel ...
-                        if(stateData_.moveTimer > 2000) {
-                            stateData_.exitMove = false;
-                            double preSpin = robotPose_.theta;
-                        }
+                    geometry_msgs::msg::Twist vel;
+
+                    // drone allignment check and lidar processing
+                    double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                    angle = correctAngle(angle);
+                    direction = angle / abs(angle);
+
+                    /* ... LiDAR processing ... */
+                    
+                    // check facing direction of drone
+                    if(dronePose_.theta - angle > 0.1) {
+                        vel.angular.z = direction * manualNavData_.rotate;
+                    }
+                    // check robot has not drifted too close to one side of the row
+                    else if (/* ... */) {
+                        /* ...*/
+                    }
+
+                    // check distance from last sample spot
+                    double distance = sqrt(pow(dronePose_.position.x - soil_.soilPose.position.x, 2) + pow(dronePose_.position.y - soil_.soilPose.position.y, 2));
+
+                    // if distance greater than X
+                    if(distance > stateData_.minSampleDistance) {
+                        
+                        // sample function
+                    
                     }
                     else {
-                        // publish to cmd_vel to rotate 180 degrees
-                        // ... publish to cmd_vel ...
-                        
-                        // calculate whether robot has turned 180 
-                        if(correctAngle(robotPose_.theta - M_PI) - preSpin < 0.1) {
-                            // change state
-                            stateData_.endSampling = false;
-                        }
+                        // drive forward
+                        vel.linear = manualNavData_.linear;
+                    } 
+
+                    // if cannot see rows with lidar assume out of field
+                    if(/* ... */) {
+                        // switch to alligning
+                        stateData_.state = ALIGNING;
+                        stateData_.changedState = true;
                     }
+
                 }
 
                 break;
