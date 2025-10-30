@@ -312,6 +312,7 @@ private:
         SurveyingState surveyingState;
         double initSurveyingAngle;
         bool startedRotating = false;
+        bool rowAlligned = false;
 
         // sampling
         bool endSampling;
@@ -348,6 +349,12 @@ private:
         geometry_msgs::msg::Point nextCrop;
 
         geometry_msgs::msg::Point rowCentre;
+
+        geometry_msgs::msg::Point rowCorner;
+
+        geometry_msgs::msg::Point rowParallel;
+        geometry_msgs::msg::Point rowPerpendicular;
+        geometry_msgs::msg::Point midRowVector;
 
     } cropData_;
 

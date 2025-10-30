@@ -141,20 +141,27 @@ PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
     goalsData_.droneGoals = goals;
     }
 
-    // start new nav thread and close previous nav thread if not finished
-    if(threadData_.threadExists == false) {
-        threadData_.navThread = std::thread(&PathPlanner::navThread, this);
-        threadData_.threadExists = true;
-    }
-    else {
-        threadData_.navDone = true;
-        threadData_.threadExists = false;
-        threadData_.navThread.join();
-        delete navThread_;
 
-        threadData_.navThread = std::thread(&PathPlanner::navThread, this);
-        threadData_.threadExists = true;
-        threadData_.navDone = false;
+    if(goalsData_.rawGoals.size() > 0) {
+
+        // save crop field corner
+        cropData_.rowCorner = goalsData_.rawGoals.back().position;
+
+        // start new nav thread and close previous nav thread if not finished
+        if(threadData_.threadExists == false) {
+            threadData_.navThread = std::thread(&PathPlanner::navThread, this);
+            threadData_.threadExists = true;
+        }
+        else {
+            threadData_.navDone = true;
+            threadData_.threadExists = false;
+            threadData_.navThread.join();
+            delete navThread_;
+
+            threadData_.navThread = std::thread(&PathPlanner::navThread, this);
+            threadData_.threadExists = true;
+            threadData_.navDone = false;
+        }
     }
 
     // publish when nav thread is done and delete nav thread?
@@ -587,12 +594,34 @@ PathPlanner::navThread()
                         cropData_.currentCrop = crops.at(0);
                         cropData_.nextCrop = crops.at(1);
 
-                        
+                        // find row centre
+                        cropData_.rowCentre = calculateAllignmentPoint(crops);
 
+                        // calculate crop field side direction vectors
+                        cropData_.rowParallel = cropData_.currentCrop - dronePose_.position;
+                        
+                        magnitude = sqrt(pow(cropData_.rowParallel.x, 2) + pow(cropData_.rowParallel.y, 2));
+                        cropData_.rowParallel.x = cropData_.rowParallel.x / magnitude;
+                        cropData_.rowParallel.y = cropData_.rowParallel.y / magnitude;
+                
+                        cropData_.rowPerpendicular.x = -1 * cropData_.rowParallel.y;
+                        cropData_.rowPerpendicular.y = cropData_.rowParallel.x;
+
+                        // calculate projection of crop row centre onto crop field perpendicular direction vector
+                        geometry_msgs::msg::Point rowCentreProj = cropData_.rowCentre - dronePose_.position;
+                        double projScaler = rowCentreProj.x * cropData_.rowPerpendicular.x + rowCentreProj.y * cropData_.rowPerpendicular.y;
+                        cropData_.midRowVector.x = cropData_.rowPerpendicular.x * projScaler;
+                        cropData_.midRowVector.y = cropData_.rowPerpendicular.y * projScaler;
+
+                        // change sub-state
+                        stateData_.surveyingState = MOVING;
 
                         break;
 
                     case MOVING:
+
+                        if(rowAlligned == false) {
+                            // face rowPerpendicular
 
                         break;
 
