@@ -334,7 +334,7 @@ private:
 
         // aligning
         State aligningState;
-
+        geometry_msgs::msg::Point checkPoint;
 
         // waiting
 

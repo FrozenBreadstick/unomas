@@ -672,18 +672,40 @@ PathPlanner::navThread()
 
                 if(stateData_.changedState == true) {
                     stateData_.changedState = false;
+                    
                     stateData_.aligningState = LEAVING;
+                    stateData_.checkPoint = dronePose_.position;
                 }
                 else {
                     switch(stateData_.aligningState)
                     {
-                        case LEAVING:
                         // go forward X
+                        case LEAVING:
+
+                            double distance = sqrt(pow(dronePose_.position.x - stateData_.rowEnd.x, 2) + pow(dronePose_.position.y - stateData_.rowEnd.y, 2));
+
+                            // if distance is smaller than mid row scaler
+                            if(distance < cropData_.midRowScaler) {
+
+                                // move forward
+                                geometry_msgs::msg::Twist vel;
+                                vel.linear = manualNavData_.linear;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = TURNING;
+                                stateData_.checkPoint = dronePose_.position;
+                            }
 
                             break;
-
-                        case TURNING:
                         // turn 90 degrees to the right or left
+                        case TURNING:
+                            // compute angle bearing
+                            angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                            angle = correctAngle(angle);
+                            direction = angle / abs(angle);
+                        
+                            // check if drone is facing the right direction
 
                             break;
 
