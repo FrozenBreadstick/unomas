@@ -1,0 +1,5 @@
+bool emergency
+int32 battery_level
+geometry_msgs/Point position
+string state
+geometry_msgs/Point target
