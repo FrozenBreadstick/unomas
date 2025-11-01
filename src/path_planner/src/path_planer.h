@@ -140,27 +140,14 @@ private:
     void navThread();
 
 
-    /*! @brief detect crops
+    /*! @brief correct angle
      *
-     *  @return vector of points of crops
-     */
-    std::vector<geometry_msgs::msg::Point> detectCrops();
-
-    /*! @brief determine distinct objects from an array of points
-     *
-     *  @param[in] crops - vector of crops
+     *  @param[in] angle - angle to be corrected
      * 
-     *  @return vector of vectors of points
+     *  @return double - corrected angle
      */
-    std::vector<std::vector<geometry_msgs::msg::Point>> determineObjects(std::vector<geometry_msgs::msg::Point> crops);
+    double correctAngle(double angle);
 
-    /*! @brief find the closest point on each object
-     *
-     *  @param[in] objects - vector of vectors of points
-     * 
-     *  @return vector of points
-     */
-    std::vector<geometry_msgs::msg::Point> findClosestPoints(std::vector<std::vector<geometry_msgs::msg::Point>> objects);
 
     /*! @brief find 2 closest points on each object
      *
@@ -179,30 +166,42 @@ private:
      */
     geometry_msgs::msg::Point calculateAllignmentPoint(std::vector<geometry_msgs::msg::Point> crops);
 
-    /*! @brief correct angle
-     *
-     *  @param[in] angle - angle to be corrected
-     * 
-     *  @return double - corrected angle
-     */
-    double correctAngle(double angle);
 
-
-    /*! @brief get raw object data
+    /*! @brief make local copy of lidar data
      *
      *  @return vector of points
      */
-    std::vector<geometry_msgs::msg::Point> getRawObjectData();
+    std::vector<geometry_msgs::msg::Point> copyLiDAR();
 
-    /*! @brief get goal data
+
+    /*! @brief make local copy of detected crop rows
      *
-     *  @return vector of poses
+     *  @return vector of points
      */
-    std::vector<geometry_msgs::msg::Pose> getGoalData();
+    std::vector<geometry_msgs::msg::Point> copyObjects();
+
+
+    /*! @brief convert raw lidar data into global vector of points
+     *
+     *  @param[in] lidar - vector of points
+     * 
+     *  @return vector of points
+     */
+    std::vector<geometry_msgs::msg::Point> processLiDAR(std::vector<geometry_msgs::msg::Point> lidar);
+
+
+    /*! @brief determine number of crop rows adjacent to the drone
+     *
+     *  @param[in] lidar - vector of points
+     * 
+     *  @return std::vector<geometry_msgs::msg::Point> - vector of points
+     */
+    std::vector<geometry_msgs::msg::Point> determineRows(std::vector<geometry_msgs::msg::Point> lidar);
+
 
 private:
 
-    enum State
+    enum class State
     {
         // SUPER STATES
         TRAVELLING,
@@ -220,13 +219,14 @@ private:
 
         // ALLIGNING SUB STATES
         LEAVING,
-        TURNING,
+        TURNING_PERP,
+        TURNING_PARA,
         A_MOVING,
         ENTERING,
         CHECKING
-    };
-
-    } state_; //!< current state of the robot
+    }; 
+    
+    State state_; //!< current state of the robot
     
 
     struct feedbackData
@@ -244,7 +244,7 @@ private:
     {
         std::mutex objectMutex;
 
-        std::vector<geometry_msgs::msg::Point> objectPoints;   // laser scanned points, and the object they are part of (i.e. crop1, crop2) (could probably make an enum for this) (might need to be a custom message)
+        std::vector<geometry_msgs::msg::Point> objectPoints;   // crop row points from ayberk (might need to be a custom message)
    
     } objects_; // vector of object points
 
@@ -253,7 +253,7 @@ private:
     {
         std::mutex groundLiDARMutex;
 
-        sensor_msgs::msg::LaserScan data;
+        sensor_msgs::msg::LaserScan data;   // data from the ground facing LiDAR
 
     } groundLiDAR_; // vector of object points
  
@@ -263,7 +263,7 @@ private:
         std::mutex soilMutex;
 
         geometry_msgs::msg::Pose soilPose; // position of the last soil sample
-        custom_msgs::SoilData soilData; // soil data
+        custom_msgs::SoilData soilData; // soil data message
 
         std::vector<geometry_msgs::msg::Point> sampledPoints; // vector of points that have been sampled
 
@@ -292,7 +292,6 @@ private:
     rclcpp::Publisher<geometry_msgs/msg::PoseStamped>::SharedPtr goalPub_; //!< publisher for current goal poses
 
     rclcpp::WallTimer<CallbackT>::SharedPtr timer_; //!< timer for feedback publishers
-
 
     // functional publishers
     rclcpp::Publisher<geometry_msgs/msg/PoseStamped>::SharedPtr navPub_; //!< publisher for goal poses
@@ -347,14 +346,6 @@ private:
     } stateData_;
 
 
-
-    enum class AligningState
-    {
-
-    };
-
-
-
     struct cropData
     {
         std::vector<geometry_msgs::msg::Point> cropCentres;
@@ -371,6 +362,8 @@ private:
 
         double midRowScaler;
         geometry_msgs::msg::Point midRowVector;
+
+        bool leftTurnRow = true;
 
     } cropData_;
 
