@@ -82,6 +82,7 @@
       filename="ignition-gazebo-velocity-control-system"
       name="ignition::gazebo::systems::VelocityControl">
       <topic>/cmd_vel</topic>
+      <timeout>0.1</timeout>
     </plugin>
   </gazebo>
 

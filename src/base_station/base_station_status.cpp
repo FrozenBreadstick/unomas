@@ -63,6 +63,7 @@ BaseStation::BaseStationStatusManager::~BaseStationStatusManager()
 
 void BaseStation::BaseStationStatusManager::statusUpdatePubCallback()
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     unomas::msg::StatusUpdatePacket status_msg;
     status_msg.name = name_;
     status_msg.emergency = emergency_;
@@ -76,25 +77,30 @@ void BaseStation::BaseStationStatusManager::statusUpdatePubCallback()
 
 void BaseStation::BaseStationStatusManager::statusEmergencySubCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     emergency_ = msg->data;
 }
 
 void BaseStation::BaseStationStatusManager::statusBatterySubCallback(const std_msgs::msg::Int32::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     battery_ = msg->data;
 }
 
 void BaseStation::BaseStationStatusManager::statusPositionSubCallback(const geometry_msgs::msg::Point::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     current_position_ = *msg;
 }
 
 void BaseStation::BaseStationStatusManager::statusStateSubCallback(const std_msgs::msg::String::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     current_state_ = msg->data;
 }
 
 void BaseStation::BaseStationStatusManager::statusTargetSubCallback(const geometry_msgs::msg::Point::SharedPtr msg)
 {
+    std::lock_guard<std::mutex> lock(resource_lock_);
     target_position_ = *msg;
 }

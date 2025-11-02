@@ -48,6 +48,8 @@ namespace BaseStation
 
             rclcpp::TimerBase::SharedPtr ui_transmit_timer_;
 
+            std::mutex resource_lock_; // Fwead safety so no segmentation fauwts x3 uwu
+
             std::string name_;
             bool emergency_;
             int battery_;
