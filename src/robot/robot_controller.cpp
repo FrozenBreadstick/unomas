@@ -5,7 +5,8 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     node_(node),
     emergency_(false),
     battery_(100),
-    current_status_("IDLE")
+    current_status_("IDLE"),
+    registered_station_("")
 {
     std::string cmd_topic = "/cmd_vel"; //In a multi robot setup this would be combined with serial_id as a prefix
     cmd_publisher_ = node_->create_publisher<geometry_msgs::msg::Twist>(cmd_topic, 10);
@@ -14,6 +15,9 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     odom_subscriber_ = node_->create_subscription<nav_msgs::msg::Odometry>(
         odom_topic, 10, std::bind(&Robot::RobotController::odomCallback, this, std::placeholders::_1)
     );
+
+    soil_query_client_ = node_->create_client<unomas::srv::QuerySoil>("query_soil");
+
 }
 
 Robot::RobotController::~RobotController()
@@ -64,4 +68,34 @@ int Robot::RobotController::getBattery()
 bool Robot::RobotController::autoNavigate()
 {
     return true;
+}
+
+void Robot::RobotController::querySoil()
+{
+    if(registered_station_ != ""){
+        last_query_odom_ = getOdometry();
+        auto x = last_query_odom_.pose.pose.position.x;
+        auto y = last_query_odom_.pose.pose.position.y;
+        while(!soil_query_client_->wait_for_service(std::chrono::milliseconds(100))){
+            RCLCPP_WARN(node_->get_logger(), "Waiting for soil query service to be available...");
+        }
+        auto request = std::make_shared<unomas::srv::QuerySoil::Request>();
+        request->x = x;
+        request->y = y;
+        soil_query_client_->async_send_request(request,
+            std::bind(&Robot::RobotController::soilRequestCallback, this, std::placeholders::_1)
+        );
+    }
+}
+
+void Robot::RobotController::soilRequestCallback(rclcpp::Client<unomas::srv::QuerySoil>::SharedFuture future)
+{
+    auto response = future.get();
+    unomas::msg::SoilInfo soil_info_msg;
+    soil_info_msg.x = last_query_odom_.pose.pose.position.x;
+    soil_info_msg.y = last_query_odom_.pose.pose.position.y;
+    soil_info_msg.moisture = response->moisture;
+    soil_info_msg.nutrients = response->nutrients;
+    soil_info_msg.ph = response->ph;
+    soil_info_publisher_->publish(soil_info_msg);
 }

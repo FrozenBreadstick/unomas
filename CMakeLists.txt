@@ -25,6 +25,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StrNum.msg"
   "msg/StrStr.msg"
   "msg/StatusUpdatePacket.msg"
+  "msg/SoilInfo.msg"
+
   "srv/DebugTrigger.srv"
   "srv/DebugResponse.srv"
   "srv/StatusUpdateService.srv"
