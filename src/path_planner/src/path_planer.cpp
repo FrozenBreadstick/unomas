@@ -168,15 +168,15 @@ PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
 
 }
 
-
+// This whole subscriber needs fixing
 // subscriber callback that listens for obstacles from detection node
 PathPlanner::subscribeObstacles(sensor_msgs::msg::LaserScan data)
 {
     // lock mutex and save data
     {
-    std::lock_guard<std::mutex> lock(groundLiDAR_.groundLiDARMutex);
+    std::lock_guard<std::mutex> lock(objects_.objectMutex);
     
-    groundLiDAR_.data = data;
+    objects_.objectPoints = data.ranges;
     }
 }
 
@@ -186,9 +186,9 @@ PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
 {
     // lock mutex and save laser data
     {
-    std::lock_guard<std::mutex> lock(objects_.objectMutex);
+    std::lock_guard<std::mutex> lock(groundLiDAR_.groundLiDARMutex);
     
-    objects_.groundLiDAR = laser;
+    groundLiDAR_.data = laser;
     }
 }
 
@@ -249,219 +249,14 @@ PathPlanner::publishGoals()
     navPub_->publish(msg);
 }
 
-
-//-------------------  OTHER FUNCTIONS AND THREADS -----------------//
-
-// correct angle
-double PathPlanner::correctAngle(double angle)
-{
-    if(angle > M_PI) {
-        angle = angle - 2 * M_PI;
-    }
-    else if(angle < -M_PI) {
-        angle = angle + 2 * M_PI;
-    }
-
-    return angle;
-}
-
-
-// detect crops
-std::vector<geometry_msgs::msg::Point> PathPlanner::detectCrops()
-{
-    std::vector<geometry_msgs::msg::Point> crops;
-
-    // lock objects mutex
-    {
-        std::lock_guard<std::mutex> lock(objects_.objectMutex);
-
-        // pushback crop objects into vector
-        for (auto object : objects_.objectPoints)
-        {
-            if (object.name == "crop")
-            {
-                crops.push_back(object.point);
-            }   
-        }
-    }
-
-    return crops;
-}
-
-
-// determine distinct objects from an array of points
-std::vector<std::vector<geometry_msgs::msg::Point>> PathPlanner::determineObjects(std::vector<geometry_msgs::msg::Point> crops) 
-{
-    // determine seperate objects
-    std::vector<std::vector<geometry_msgs::msg::Point>> objects;    // each vector contains all points of one object
-    objects.push_back(std::vector<geometry_msgs::msg::Point>)
-    objects.at(0).push_back(crops.at(0));    // start by putting first point into first object
-    int lastObject = 0;     // to say which object the last point belongs to
-    int pointsLogged = 1;   // number of points logged in current object
-
-    for(int i = 1; i < crops.size(); i++) {
-
-        // dist between current point and last point in current object
-        float dist = sqrt(pow(crops.at(i).x - objects.at(lastObject).at(pointsLogged-1).x, 2) + pow(crops.at(i).y - objects.at(lastObject).at(pointsLogged-1).y, 2));
-        
-        if(dist > minDistObjects) {
-            // if distance is larger than minDistObjects, then add point to new object
-            objects.push_back(std::vector<geometry_msgs::msg::Point>());
-            objects.at(lastObject+1).push_back(crops.at(i));
-            lastObject++;
-            pointsLogged = 1;
-        }
-        else {
-            // if distance is smaller than minDistObjects, then add point to current object
-            objects.at(lastObject).push_back(crops.at(i));
-            pointsLogged++;
-        }
-    }
-
-    return objects;
-}
-
-std::vector<geometry_msgs::msg::Point> PathPlanner::processLiDAR()
-{
-    // ...
-}
-
-// find the closest point on each object
-std::vector<geometry_msgs::msg::Point> PathPlanner::findClosestPoints(std::vector<std::vector<geometry_msgs::msg::Point>> objects)
-{
-
-    std::vector<geometry_msgs::msg::Point> closestPoints;
-
-    // calculate the closest crop from each object and keep the closest 2
-    if(objects.size() < 1) {
-        RCLCPP_ERROR(this->get_logger(), "Error: No objects detected");
-        return closestPoints;
-    }
-
-    int pointTracker = 0;
-    int objectTracker = 0;
-
-    // check for smallest distance per object
-    for(auto object : objects) {
-        for(auto point : object) {
-            if( pointTracker == 0 ) {
-                closestPoints.push_back(point);
-            }
-            else {
-                float dist1 = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
-                float dist2 = sqrt(pow(closestPoints.at(objectTracker).x - robotPose_.position.x, 2) + pow(closestPoints.at(objectTracker).y - robotPose_.position.y, 2));
-
-                if(dist1 < dist2) {
-                    closestPoints.at(objectTracker) = point;
-                }
-            }
-
-            pointTracker++;
-        }
-
-        objectTracker++;
-        pointTracker = 0;
-    }
-
-    return closestPoints;
-}
-
-
-// find 2 closest points on each object
-std::vector<geometry_msgs::msg::Point> PathPlanner::twoClosest(std::vector<geometry_msgs::msg::Point> closestPoints)
-{
-    // save closest 2 points
-    geometry_msgs::msg::Point closestPoint = closestPoints.at(0);
-    double closestDist = sqrt(pow(closestPoint.x - robotPose_.position.x, 2) + pow(closestPoint.y - robotPose_.position.y, 2));
-    geometry_msgs::msg::Point nextClosestPoint = closestPoint;
-    double nextClostestDist = closestDist;
-    int pointTracker = 0;
-
-    for(auto point : closestPoints) {
-        if(pointTracker != 0) {
-
-            // check if new closest point
-            dist = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
-            if(dist < closestDist) {    // if new closest point
-                nextClosestPoint = closestPoint;
-                nextClostestDist = closestDist;
-
-                closestPoint = point;
-                closestDist = dist;
-            }
-            else if(pointTracker == 1) {    // if second point but not closest
-                nextClosestPoint = point;
-                nextClostestDist = dist;
-            }
-            else if(dist < nextClostestDist) {  // if new second closest points
-                nextClosestPoint = point;
-                nextClostestDist = dist;
-            }
-        }
-
-        pointTracker++;
-    }
-
-    // put closest points into vector
-    std::vector<geometry_msgs::msg::Point> twoCloesest;
-    twoCloesest.push_back(closestPoint);
-    twoCloesest.push_back(nextClosestPoint);
-
-    return twoCloesest;
-}
-
-// calculate allignment point on 2 closest points
-geometry_msgs::msg::Point PathPlanner::calculateAllignmentPoint(std::vector<geometry_msgs::msg::Point> closestPoints)
-{
-    // to be returned (point where the robot should move to)
-    geometry_msgs::msg::Point allignmentPoint;
-
-    // calculate centroid of crops and direction of crops using two closest points
-    allignmentPoint.x = (closestPoints.at(0).x + closestPoints.at(1).x) / 2;
-    allignmentPoint.y = (closestPoints.at(0).y + closestPoints.at(1).y) / 2;
-
-    // return allignment point
-    return allignmentPoint;
-}
-
-
-// get raw object data
-std::vector<geometry_msgs::msg::Point> PathPlanner::getRawObjectData()
-{
-    std::vector<geometry_msgs::msg::Point> rawObjects;
-
-    // lock objects mutex
-    {
-        std::lock_guard<std::mutex> lock(objects_.objectMutex);
-
-        rawObjects = objects_.objectPoints;
-    }
-
-    return rawObjects;
-
-}
-
-// Get goal data
-std::vector<geometry_msgs::msg::Pose> PathPlanner::getGoalData()
-{
-    std::vector<geometry_msgs::msg::Pose> goalData;
-    
-    // lock goals mutex
-    {
-        std::lock_guard<std::mutex> lock(goalsData_.goalsMutex);
-        
-        goalData = goals_.rawGoals;
-    }
-
-    return goalData;
-}
+//-------------------  MAIN THREADED LOOP  -----------------//
 
 
 // main threaded loop that runs the planner (4 states: travelling, aligning, sampling, emergency)
 PathPlanner::navThread()
 {
 
-    state_ = TRAVELLING;
+    stateData_.superState = TRAVELLING;
     feedbackData_.state = "TRAVELLING";
 
     while(threadData_.navDone == false)
@@ -470,9 +265,8 @@ PathPlanner::navThread()
         // get odo service call to base station
         // ... (ask mattia for advice) ...
 
-
         // do state actions
-        switch(state_)
+        switch(stateData_.superState)
         {
             // travelling to field guess
             case TRAVELLING:
@@ -538,14 +332,6 @@ PathPlanner::navThread()
             // surveying
             case SURVEYING:
 
-
-
-
-
-                // move forward to row middle and turn to face down row (rotate 90 to the right)
-
-                // switch to sampling
-
                 switch(stateData_.surveyingState)
                 {
                     // do a rotation and identify closest (starting row/current row) and second closest (next row) row centre to beacon
@@ -609,187 +395,318 @@ PathPlanner::navThread()
 
                         // calculate projection of crop row centre onto crop field perpendicular direction vector
                         geometry_msgs::msg::Point rowCentreProj = cropData_.rowCentre - dronePose_.position;
-                        double projScaler = rowCentreProj.x * cropData_.rowPerpendicular.x + rowCentreProj.y * cropData_.rowPerpendicular.y;
-                        cropData_.midRowVector.x = cropData_.rowPerpendicular.x * projScaler;
-                        cropData_.midRowVector.y = cropData_.rowPerpendicular.y * projScaler;
+                        cropData_.midRowScaler = rowCentreProj.x * cropData_.rowPerpendicular.x + rowCentreProj.y * cropData_.rowPerpendicular.y;
+                        cropData_.midRowVector.x = cropData_.rowPerpendicular.x * cropData_.midRowScaler;
+                        cropData_.midRowVector.y = cropData_.rowPerpendicular.y * cropData_.midRowScaler;
 
                         // change sub-state
                         stateData_.surveyingState = MOVING;
 
                         break;
+                    
+                    // move forward to row middle and turn to face down row (rotate 90 to the right)
+                    case S_MOVING:
+                        geometry_msgs::msg::Twist vel;
 
-                    case MOVING:
+                        if(stateData_.rowAlligned == false) {
+                            // calculate angle between rowPerpendicular and drone
+                            angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                            angle = correctAngle(angle);
+                            direction = angle / abs(angle);
 
-                        if(rowAlligned == false) {
-                            // face rowPerpendicular
+                            // calculate magnitude of distance from corner to drone
+                            distance = sqrt(pow(dronePose_.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.position.y - cropData_.rowCorner.y, 2));
+
+                            // check if drone is facing perp to row and close to mid row
+                            if(dronePose_.theta - angle > 0.1) {
+
+                                vel.angular = direction * manualNavData_.rotate;
+                            }
+                            else if(distance - cropData_.midRowScaler > 0.1) {
+                                vel.linear = manualNavData_.linear;
+                            }
+                            else {
+                                stateData_.rowAlligned = true;
+                            }
+                        }
+                        else {
+                            // calculate angle between rowParallel and drone
+                            angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            angle = correctAngle(angle);
+                            direction = angle / abs(angle);
+
+                            // check if drone is facing down row
+                            if(dronePose_.theta - angle > 0.1) {
+                                vel.angular = direction * manualNavData_.rotate;
+                            }
+                            else { 
+                                stateData_.surveyingState = EXITING;
+                            }
+                        }
+
+                        cmdVelPub_->publish(vel);
 
                         break;
 
+                    // switch to sampling
                     case EXITING:
+                        
+                        // reset state data
+                        stateData_.state = SAMPLING;
+                        stateData_.surveyingState = ROTATING;
+                        stateData_.changedState = true;
+                        stateData_.rowAlligned = false;
 
                         break;
                 }
 
                 break;
 
-
             // aligning
             case ALIGNING:
 
-                // save current row into "past rows" array, save "next row" into "current row"
+                if(stateData_.changedState == true) {
+                    stateData_.changedState = false;
+                    
+                    stateData_.aligningState = LEAVING;
+                    stateData_.checkPoint = dronePose_.position;
+                }
+                else {
+                    switch(stateData_.aligningState)
+                    {
+                        // go forward X
+                        case LEAVING:
 
-                // ID all row centres, remove row centres near already completed rows, find row centre closest to "current row" and save as next row
+                            double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
 
-                // find midpoint between "current row" and "next row", calculate direction and distance to move to midpoint
-                
-                // turn to direction of line, move forward, then turn 90 degrees to face down row (maybe a bool that gets toggled between left and right? (or -1 and 1))
+                            // if distance is smaller than mid row scaler
+                            if(distance < cropData_.midRowScaler) {
 
-                // switch to sampling
+                                // move forward
+                                geometry_msgs::msg::Twist vel;
+                                vel.linear = manualNavData_.linear;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = TURNING_PERP;
+                                stateData_.checkPoint = dronePose_.position;
+                            }
 
+                            break;
+                        // turn 90 degrees to the right or left to face down field side
+                        case TURNING_PERP:
+                            // compute angle bearing
+                            double angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                            double angleDesired = correctAngle(angleDesired);
+                            double angle = angleDesired - dronePose_.theta;
+                            double angle = correctAngle(angle);
+                            int direction = angle / abs(angle);
 
+                            // check if drone is facing the right direction
+                            if(angle > 0.1) {
+                                geometry_msgs::msg::Twist vel;
+                                vel.angular.z = direction * manualNavData_.rotate;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = A_MOVING;
+                                stateData_.checkpoint = dronePose_.position;
+                            }
 
+                            break;
 
+                        // go forward X*2
+                        case A_MOVING:
+                            
+                            double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
 
-                // detect obstacles to detect the field rows
-                std::vector<geometry_msgs::msg::Point> crops = detectCrops(); //alternatively use this to make a local copy of the var
+                            // if distance is smaller than mid row scaler * 1.5
+                            if(distance < cropData_.midRowScaler * 2) {
 
-                // calculate allginment position
-                std::vector<std::vector<geometry_msgs::msg::Point>> objects = determineObjects(crops);
-                std::vector<geometry_msgs::msg::Point> closestPoints = findClosestPoints(objects);
-                std::vector<geometry_msgs::msg::Point> twoClosestPoints = twoClosest(closestPoints);
-                geometry_msgs::msg::Point allignmentPoint = calculateAllignmentPoint(twoClosestPoints);
+                                // move forward
+                                geometry_msgs::msg::Twist vel;
+                                vel.linear = manualNavData_.linear;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = TURNING_PARA;
+                                stateData_.checkpoint = dronePose_.position;
+                            }
 
-                // check that allignment point is not in already sampled row
-                for(auto point : sampledPoints) {
+                            break;
 
-                    distance = sqrt(pow(point.x - allignmentPoint.x, 2) + pow(point.y - allignmentPoint.y, 2));
-                    if(distance < minSampleDistance) {
-                        RCLCPP_ERROR(this->get_logger(), "Error: Allignment point is in already sampled row");
+                        // turn 90 degrees to the right or left to face down row
+                        case TURNING_PARA:
+
+                            // set angle
+                            if(cropData_.leftTurnRow == true) {
+                                int direction = -1;
+                            }
+                            else {
+                                int direction = 1;
+                            }
                         
-                        // if allignment point is in already sampled row, then move to sampling
+                            // compute angle bearing
+                            double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            double angleDesired = correctAngle(angleDesired);
+                            double angle = angleDesired - dronePose_.theta;
+                            double angle = correctAngle(angle);
+
+                            // check if drone is facing the right direction
+                            if(angle > 0.1) {
+
+                                // turn
+                                geometry_msgs::msg::Twist vel;
+                                vel.angular.z = direction * manualNavData_.rotate;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = ENTERING;
+                                stateData_.checkpoint = dronePose_.position;
+                            }
+
+                        // go forward X*1.5
+                        case ENTERING:
+
+                            double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
+
+                            // if distance is smaller than mid row scaler * 1.5
+                            if(distance < cropData_.midRowScaler * 1.5) {
+
+                                // move forward
+                                geometry_msgs::msg::Twist vel;
+                                vel.linear = manualNavData_.linear;
+                                cmdVelPub_->publish(vel);
+                            }
+                            else {
+                                stateData_.aligningState = CHECKING;
+                                stateData_.checkpoint = dronePose_.position;
+                            }
+
+                            break;
+                        
+                        // check if row exists
+                        case CHECKING:
+
+                            // check if drone is facing down a row
+                            if(dronePose_.theta - angle > 0.1) {
+
+                                // check there is a row on either side of the drone using ground lidar
+                                int crops = determineRows(processLiDAR(copyLiDAR()));
+                                
+                                // if there is a row on either side of the drone
+                                if(crops.size() == 2) {
+                                    // we are in a row move to sampling
+                                    stateData_.state = SAMPLING;
+                                    stateData_.changedState = true;
+                                }
+                                else if(crops.size() == 1) {
+                                    // we are done in this field switch to idle
+                                    stateData_.state = IDLE;
+                                    stateData_.changedState = true;
+                                    navThreadDone = true;
+                                }
+                                else {
+                                    // we are not in a row and there has been an issue switch to emergency
+                                    stateData_.state = EMERGENCY;
+                                    stateData_.changedState = true;
+                                }
+                                 
+                            }
+                            else {
+                                // set angle
+                                if(cropData_.leftTurnRow == true) {
+                                    int direction = -1;
+                                }
+                                else {
+                                    int direction = 1;
+                                }
+                            
+                                // compute angle bearing
+                                double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                                double angleDesired = correctAngle(angleDesired);
+                                double angle = angleDesired - dronePose_.theta;
+                                double angle = correctAngle(angle);
+                            
+                                geometry_msgs::msg::Twist vel;
+                                vel.angular.z = direction * manualNavData_.rotate;
+                                cmdVelPub_->publish(vel);
+                            }
+
+
+                            break;
                     }
                 }
-
-                // OPTION 1: Manual allignment
-                    // determine velocity to move to allignment position
-                    // publish to cmd_vel and moniter status
-                        // if cannot allign after X time move to emergency
-                
-                // OPTION 2: Automatic allignment
-                    // Publish to nav2 and moniter status
-                        // if Nav2 is stuck and not moving, then cancel and republish goal
-                            // if cannot reach goal after X time move to emergency
-                    
-                // if allignment is complete, then move to sampling
-
 
                 break;
 
             // sampling
             case SAMPLING:
 
-                // determine if still in field by using the ground pointing LiDAR to detect the field rows (convert ground facing LiDAR points to see elevation in ground over a certian treshold)
+                //make local copy of LiDAR data
 
-                // if still in field, then check if outside of sample range
-
-                    // if outside of sample range, then sample
-
-                    // else 
-                        // drive forward
-                
-                // else
-                    // drive forward and do a 180 rotation towards the field
-
-                    // move to allgining
-
-
-
-
-
-                if(stateData_.endSampling_ == false) {
-
-                    // find 2 closest points on each object
-                    std::vector<geometry_msgs::msg::Point> rawPoints = getRawObjectData(); //alternatively use this to make a local copy of the var
-                    std::vector<std::vector<geometry_msgs::msg::Point>> objects = determineObjects(rawPoints);
-                    std::vector<geometry_msgs::msg::Point> crops = findClosestPoints(objects);
-                    std::vector<geometry_msgs::msg::Point> twoClosestPoints = twoClosest(crops);
-
-                    // determine perpendicular allignment
-                    double paraAngle = atan2(twoClosestPoints.at(1).y - twoClosestPoints.at(0).y, twoClosestPoints.at(1).x - twoClosestPoints.at(0).x);
-                    double perpAngle = paraAngle + M_PI / 2;
-
-                    // calculate rotation needed to align with field
-                    double rotation = perpAngle - robotPose_.theta;
-                    rotation = correctAngle(rotation);
-
-                    // check parallel to field
-                    if(rotation > 0.1) {
-
-                        rotVel = rotation * vel_.rotate;
-
-                        // allign with field
-                        publishCmdVel(vel_.rotate);
-                    }
-                    else {
-                        // begin probing process
-                        bool sampleHere = true;
-
-                        for( point : sampledPoints) {
-
-                            distance = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
-
-                            if(distance > minSampleDistance) {
-                                // take sample
-                                sampleHere = false;
-                            }
-                        }
-
-                        if(sampleHere == true) {
-                            // sample location
-                            // ... service call to get sample ...
-                            // ... publish to soilData ...
-                        }
-                        else {
-                            // move forward slightly
-                            // ... publish to cmd_vel ...
-                        }
-                    }
-
-                    // determine if still in field
-                    std::vector<geometry_msgs::msg::Point> crops = detectCrops(); //alternatively use this to make a local copy of the var
-                    if(crops.size() == 0) {
-                        // count up and if counter reaches 10 then move forward  and rotate 180 degrees
-                        stateData_.noCropsCounter++;
-                        if(stateData_.noCropsCounter > 10) {
-                            stateData_.noCropsCounter = 0;
-                            stateData_.endSampling = true;
-                            stateData_.moveTimer = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                        }
-                        // then switch to alligning
-                    }
-                    else {
-                        stateData_.noCropsCounter = 0;
-                    }
+                // if just changed state
+                if(stateData_.changedState == true) {
+                    
+                    stateData_.changedState = false;
+                    
+                    // sample function
                 }
                 else {
-                    if(stateData_.exitMove == true) {
-                        // publish to cmd_vel to move forward
-                        // ... publish to cmd_vel ...
-                        if(stateData_.moveTimer > 2000) {
-                            stateData_.exitMove = false;
-                            double preSpin = robotPose_.theta;
-                        }
+                    geometry_msgs::msg::Twist vel;
+
+                    // drone allignment check and lidar processing
+                    double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                    angle = correctAngle(angle);
+                    direction = angle / abs(angle);
+
+                    // process lidar
+                    rows = determineRows(processLiDAR(copyLiDAR()));
+
+                    // check still in row
+                    if(rows.size() < 2) {
+                        stateData_.state = ALIGNING;
+                        stateData_.changedState = true;
+                        break;
                     }
                     else {
-                        // publish to cmd_vel to rotate 180 degrees
-                        // ... publish to cmd_vel ...
+                        distLeft = sqrt(pow(rows.at(0).x - dronePose_.position.x, 2) + pow(rows.at(0).y - dronePose_.position.y, 2));
+                        distRight = sqrt(pow(rows.at(1).x - dronePose_.position.x, 2) + pow(rows.at(1).y - dronePose_.position.y, 2));
+
+                        diff = distLeft - distRight;
+                    }
+
+                    
+                    // check facing direction of drone
+                    if(dronePose_.theta - angle > 0.1) {
+                        vel.angular.z = direction * manualNavData_.rotate;
+                    }
+                    // check robot has not drifted too close to one side of the row
+                    else if (abs(diff) > 0.1) {
                         
-                        // calculate whether robot has turned 180 
-                        if(correctAngle(robotPose_.theta - M_PI) - preSpin < 0.1) {
-                            // change state
-                            stateData_.endSampling = false;
+                        // check direction needed and set velocity
+                        if(diff > 0) {
+                            vel.linear = manualNavData_.linear;
+                        }
+                        else {
+                            vel.linear = -1 * manualNavData_.linear;
                         }
                     }
+
+                    // check distance from last sample spot
+                    double distance = sqrt(pow(dronePose_.position.x - soil_.soilPose.position.x, 2) + pow(dronePose_.position.y - soil_.soilPose.position.y, 2));
+
+                    // if distance greater than X
+                    if(distance > stateData_.minSampleDistance) {
+                        
+                        // sample function
+                    
+                    }
+                    else {
+                        // drive forward
+                        vel.linear = manualNavData_.linear;
+                    } 
+
                 }
 
                 break;
@@ -817,3 +734,204 @@ PathPlanner::navThread()
     }   
 // exit main loop
 }
+
+//-------------------  OTHER FUNCTIONS  -----------------//
+
+// correct angle
+double PathPlanner::correctAngle(double angle)
+{
+    if(angle > M_PI) {
+        angle = angle - 2 * M_PI;
+    }
+    else if(angle < -M_PI) {
+        angle = angle + 2 * M_PI;
+    }
+
+    return angle;
+}
+
+
+// find 2 closest points on each object
+std::vector<geometry_msgs::msg::Point> PathPlanner::twoClosest(std::vector<geometry_msgs::msg::Point> closestPoints)
+{
+    // save closest 2 points
+    geometry_msgs::msg::Point closestPoint = closestPoints.at(0);
+    double closestDist = sqrt(pow(closestPoint.x - robotPose_.position.x, 2) + pow(closestPoint.y - robotPose_.position.y, 2));
+    geometry_msgs::msg::Point nextClosestPoint = closestPoint;
+    double nextClostestDist = closestDist;
+    int pointTracker = 0;
+
+    for(auto point : closestPoints) {
+        if(pointTracker != 0) {
+
+            // check if new closest point
+            dist = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
+            if(dist < closestDist) {    // if new closest point
+                nextClosestPoint = closestPoint;
+                nextClostestDist = closestDist;
+
+                closestPoint = point;
+                closestDist = dist;
+            }
+            else if(pointTracker == 1) {    // if second point but not closest
+                nextClosestPoint = point;
+                nextClostestDist = dist;
+            }
+            else if(dist < nextClostestDist) {  // if new second closest points
+                nextClosestPoint = point;
+                nextClostestDist = dist;
+            }
+        }
+
+        pointTracker++;
+    }
+
+    // put closest points into vector
+    std::vector<geometry_msgs::msg::Point> twoCloesest;
+    twoCloesest.push_back(closestPoint);
+    twoCloesest.push_back(nextClosestPoint);
+
+    return twoCloesest;
+}
+
+
+// calculate allignment point on 2 closest points
+geometry_msgs::msg::Point PathPlanner::calculateAllignmentPoint(std::vector<geometry_msgs::msg::Point> closestPoints)
+{
+    // to be returned (point where the robot should move to)
+    geometry_msgs::msg::Point allignmentPoint;
+
+    // calculate centroid of crops and direction of crops using two closest points
+    allignmentPoint.x = (closestPoints.at(0).x + closestPoints.at(1).x) / 2;
+    allignmentPoint.y = (closestPoints.at(0).y + closestPoints.at(1).y) / 2;
+
+    // return allignment point
+    return allignmentPoint;
+}
+
+
+// make local copy of lidar data
+std::vector<geometry_msgs::msg::Point> PathPlanner::copyLiDAR()
+{
+    std::vector<geometry_msgs::msg::Point> crops;
+
+    // lock objects mutex
+    {
+        std::lock_guard<std::mutex> lock(groundLiDAR_.groundLiDARMutex);
+
+        // pushback crop objects into vector
+        crops = groundLiDAR_.data.ranges;
+    }
+
+    return crops;
+}
+
+
+// make local copy of detected crop rows
+std::vector<geometry_msgs::msg::Point> PathPlanner::copyObjects()
+{
+    std::vector<geometry_msgs::msg::Point> crops;
+
+    // lock objects mutex
+    {
+        std::lock_guard<std::mutex> lock(objects_.groundLiDARMutex);
+
+        // pushback crop objects into vector
+        crops = objects_.groundLiDAR.data.ranges;
+    }
+
+    return crops;
+}
+
+
+// convert raw lidar data into global vector of points
+std::vector<geometry_msgs::msg::Point> PathPlanner::processLiDAR(std::vector<geometry_msgs::msg::Point> lidar) 
+{
+    std::vector<geometry_msgs::msg::Point> globalCartesian;
+
+    // convert polar to global
+    for(int i = 0; i < lidar.size(); i++) {
+
+        geometry_msgs::msg::Point localCart;
+
+        theta = lidar.angle_min + lidar.angle_increment * i;
+
+        // convert from polar to cartesian
+        localCart.x = lidar.at(i) * cos(theta);
+        localCart.y = lidar.at(i) * sin(theta);
+        localCart.z = 0;
+
+        // apply LiDAR tilt correction (45 degrees down on x axis)
+        localCart.y = LocalCart.y * cos(M_PI/4);
+        LocalCart.z = LocalCart.y * sin(-M_PI/4);
+
+        // convert from lidar to robot position frame
+        LocalCart.x = LocalCart.x - LidarOffset.x;
+        LocalCart.y = LocalCart.y - LidarOffset.y;
+        LocalCart.z = LocalCart.z - LidarOffset.z;
+
+        // convert from robot to global frame
+        LocalCart.x = LocalCart.x + dronePose_.position.x;
+        LocalCart.y = LocalCart.y + dronePose_.position.y;
+        LocalCart.z = LocalCart.z + dronePose_.position.z;
+
+        // add to vector
+        globalCartesian.at(i) = LocalCart;
+    }
+
+    return globalCartesian;
+
+}
+
+
+// determine number of rows adjacent to the drone
+std::vector<geometry_msgs::msg::Point> PathPlanner::determineRows(std::vector<geometry_msgs::msg::Point> lidar)
+{
+    std::vector<geometry_msgs::msg::Point> rows;
+
+    bool newRow = true;
+    double maxZ = 0;
+    double maxIndex = 0;
+
+    // check number of bumps greater than bum threshold
+    for(int i = 0; i < lidar.size(); i++) {
+        
+        // check is within row threshold (1.5* midRowScaler length)
+        double distance = sqrt(pow(lidar.at(i).x - dronePose_.position.x, 2) + pow(lidar.at(i).y - dronePose_.position.y, 2));
+        
+        // check it is an adjacent row
+        if(distance > cropData_.midRowScaler * 1.5) {
+
+            // check it is a genuine bump
+            if(lidar.at(i).z > bumpThreshold) {
+
+                // check if new row
+                if(newRow == true) {
+
+                    // set new max
+                    maxZ = lidar.at(i).z;
+                    maxIndex = i;
+                    newRow = false;
+                }
+                else {
+
+                    // check if new max
+                    if(maxZ < lidar.at(i).z) {
+                        maxZ = lidar.at(i).z;
+                        maxIndex = i;
+                    }
+                }
+            }
+            else {
+                newRow = true;
+                rows.push_back(lidar.at(maxIndex));
+            }
+        }
+    }
+
+    return rows;
+
+}
+
+
+// identify the 2 closest 
