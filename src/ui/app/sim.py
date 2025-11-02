@@ -36,13 +36,14 @@ class Robot:
     heading: float = 0.0
     battery: float = 100.0
     status: str = "idle"  # idle, moving, sampling, returning, paused
+    emergency: bool = False
     next_goal: tuple = None
     visited: set = field(default_factory=set)
 
     def to_dict(self):
         return dict(serial=self.serial, x=self.x, y=self.y, heading=self.heading,
                     battery=round(self.battery,1), status=self.status,
-                    next_goal=self.next_goal)
+                    emergency=self.emergency, next_goal=self.next_goal)
 
 class SwarmSim:
     def __init__(self):
@@ -181,3 +182,64 @@ class SwarmSim:
                 },
                 "robots": [r.to_dict() for r in self.robots.values()]
             }
+
+    def apply_status_packet(self, packet: dict) -> bool:
+        """
+        Update a robot entry using live ROS/StatusUpdatePacket data.
+        Returns True when the in-memory state changed (useful to avoid redundant SSE pushes).
+        """
+        serial = str(packet.get("serial", "")).strip()
+        if not serial:
+            return False
+
+        pos = packet.get("position") or {}
+        target = packet.get("target") or {}
+        changed = False
+
+        with self._lock:
+            robot = self.robots.get(serial)
+            if robot is None:
+                robot = Robot(serial=serial)
+                self.robots[serial] = robot
+                self._idx_assign.setdefault(serial, 0)
+                changed = True
+
+            new_x = float(pos.get("x", robot.x))
+            new_y = float(pos.get("y", robot.y))
+            dx = new_x - robot.x
+            dy = new_y - robot.y
+            if abs(dx) > 1e-3 or abs(dy) > 1e-3:
+                robot.x = new_x
+                robot.y = new_y
+                if abs(dx) > 1e-6 or abs(dy) > 1e-6:
+                    robot.heading = math.degrees(math.atan2(dy, dx))
+                changed = True
+
+            battery = packet.get("battery")
+            if battery is not None:
+                new_batt = float(battery)
+                if abs(new_batt - robot.battery) > 1e-3:
+                    robot.battery = new_batt
+                    changed = True
+
+            emergency = bool(packet.get("emergency", False))
+            if emergency != robot.emergency:
+                robot.emergency = emergency
+                changed = True
+
+            status = packet.get("status")
+            if emergency:
+                status = "emergency"
+            if status:
+                status_norm = str(status).lower()
+                if status_norm != robot.status:
+                    robot.status = status_norm
+                    changed = True
+
+            if "x" in target and "y" in target:
+                goal = (float(target["x"]), float(target["y"]))
+                if robot.next_goal != goal:
+                    robot.next_goal = goal
+                    changed = True
+
+        return changed
