@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
 
-    auto params = std::make_shared<rclcpp::Node>("params");
+    auto params = std::make_shared<rclcpp::Node>("params_base_station");
 
     params->declare_parameter<std::string>("station_name");
     std::string station_name;

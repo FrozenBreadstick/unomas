@@ -1,0 +1,6 @@
+float64 x
+float64 y
+---
+float64 moisture
+float64 ph
+float64 nutrients

@@ -12,6 +12,10 @@ find_package(ros_ign_interfaces REQUIRED)
 
 find_package(geometry_msgs REQUIRED)
 
+find_package(nav_msgs REQUIRED)
+
+find_package(grid_map_core REQUIRED)
+
 find_package(rclcpp REQUIRED)
 
 
@@ -24,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/DebugTrigger.srv"
   "srv/DebugResponse.srv"
   "srv/StatusUpdateService.srv"
+  "srv/QuerySoil.srv"
   DEPENDENCIES geometry_msgs
 )
 rosidl_get_typesupport_target(custom_messages ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -57,11 +62,39 @@ ament_target_dependencies(ui_bridge
   rclcpp
 )
 
+add_executable(simulation_extras
+  src/simulation/simulation_main.cpp
+  src/simulation/simulation_extra.cpp
+)
+target_link_libraries(simulation_extras
+  ${custom_messages}
+)
+ament_target_dependencies(simulation_extras
+  rclcpp
+  grid_map_core
+)
+
+add_executable(robot
+  src/robot/robot_main.cpp
+  src/robot/robot_controller.cpp
+  src/robot/robot_uplink.cpp
+)
+target_link_libraries(robot
+  ${custom_messages}
+)
+ament_target_dependencies(robot
+  rclcpp
+  geometry_msgs
+  nav_msgs
+)
+
 #install executables to lib
 install(
   TARGETS 
     base_station
     ui_bridge
+    simulation_extras
+    robot
   DESTINATION lib/${PROJECT_NAME}
 )
 
