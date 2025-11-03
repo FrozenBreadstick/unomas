@@ -3,86 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UNO MAS – Swarm Control</title>
+  <title>UNO MAS – Odometry Monitor</title>
   <link rel="stylesheet" href="/static/css/style.css"/>
 </head>
 <body>
 <header>
-  <h1>UNO MAS <span>Swarm Control</span></h1>
-  <nav>
-    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="mission">Mission</button>
-    <button class="tab-btn" data-tab="robots">Robots</button>
-    <button class="tab-btn" data-tab="about">About</button>
-  </nav>
+  <h1>UNO MAS <span>Odometry Monitor</span></h1>
 </header>
 
 <main>
-  <section id="dashboard" class="tab active">
-    <div class="grid">
-      <div class="card">
-        <h2>Status</h2>
-        <p><b>Mission:</b> <span id="mission-active">—</span></p>
-        <p><b>Field:</b> <span id="mission-size">—</span></p>
-        <div class="controls">
-          <button id="start-btn">▶ Start</button>
-          <button id="pause-btn">⏸ Pause</button>
-          <button id="resume-btn">⏵ Resume</button>
-          <button id="rth-btn">🏠 Return All</button>
-        </div>
+  <section class="card odom-card">
+    <h2>Robot Odometry</h2>
+    <p class="muted">Listening to ROS2 topic <code id="odom-topic">/odom</code>.</p>
+    <div class="odom-grid">
+      <div>
+        <h3>Position (m)</h3>
+        <p><strong>X</strong> <span id="pos-x">—</span></p>
+        <p><strong>Y</strong> <span id="pos-y">—</span></p>
+        <p><strong>Z</strong> <span id="pos-z">—</span></p>
       </div>
-      <div class="card">
-        <h2>Live Map</h2>
-        <canvas id="map" width="640" height="360"></canvas>
-        <small>Not to scale. Rect = field | Dots = robots</small>
+      <div>
+        <h3>Orientation (rad)</h3>
+        <p><strong>Roll</strong> <span id="orient-roll">—</span></p>
+        <p><strong>Pitch</strong> <span id="orient-pitch">—</span></p>
+        <p><strong>Yaw</strong> <span id="orient-yaw">—</span></p>
+      </div>
+      <div>
+        <h3>Velocity</h3>
+        <p><strong>Linear</strong> <span id="vel-linear">—</span> m/s</p>
+        <p><strong>Angular</strong> <span id="vel-angular">—</span> rad/s</p>
       </div>
     </div>
-  </section>
-
-  <section id="mission" class="tab">
-    <div class="card">
-      <h2>Define Mission</h2>
-      <div class="form-grid">
-        <label>Origin X (m) <input type="number" id="origin-x" value="5" step="1"></label>
-        <label>Origin Y (m) <input type="number" id="origin-y" value="5" step="1"></label>
-        <label>Width (m) <input type="number" id="size-w" value="60" step="1"></label>
-        <label>Height (m) <input type="number" id="size-h" value="40" step="1"></label>
-        <label>Grid Spacing (m) <input type="number" id="spacing" value="5" step="1"></label>
-      </div>
-      <button id="save-mission">💾 Save Mission</button>
-    </div>
-  </section>
-
-  <section id="robots" class="tab">
-    <div class="card">
-      <h2>Robots</h2>
-      <div class="row">
-        <input id="serial-input" placeholder="Enter serial e.g. R-1003"/>
-        <button id="register-btn">➕ Register</button>
-      </div>
-      <table id="robots-table">
-        <thead><tr><th>Serial</th><th>Status</th><th>Battery</th><th>Pos (x,y)</th><th>Next Goal</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section id="about" class="tab">
-    <div class="card">
-      <h2>About</h2>
-      <p>This is a minimal, one-folder control UI for the UNO MAS swarm (soil sampling robots). It runs a local simulator by default, and exposes a clean API for later ROS2 integration.</p>
-      <ul>
-        <li>Set a rectangular field and sampling grid</li>
-        <li>Register robots by serial</li>
-        <li>Start, Pause, Resume, Return-to-Base</li>
-        <li>Live updates via Server-Sent Events</li>
-      </ul>
+    <div class="meta">
+      <p><strong>Frame</strong> <span id="frame-id">—</span></p>
+      <p><strong>Timestamp</strong> <span id="stamp">—</span></p>
     </div>
   </section>
 </main>
 
 <footer>
-  <span>UNO MAS • Robotics Studio 1</span>
+  <span>UNO MAS • Odometry Feed</span>
 </footer>
 
 <script src="/static/js/app.js"></script>
