@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
-  <name>local_adjustment</name>
+  <name>field_sampling</name>
   <version>0.0.1</version>
-  <description>perception_node</description>
+  <description>navigates the robot through a field taking samples</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <maintainer email="connor.a.mcgannon@student.uts.edu.au">Connor McGannon</maintainer>
