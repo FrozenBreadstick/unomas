@@ -1,14 +1,16 @@
 #ifndef PATH_PLANER_H
 #define PATH_PLANER_H
 
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/pose.hpp>
-#include <sensor_msgs/msg/laser_scan.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-#include <std_msgs/msg/string.hpp>
+#include "rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/pose.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/string.hpp"
 
-//#include <custom_msgs/SoilData.h>
-//#include <custom_msgs/Obstacles.h>
+
+#include "unomas/srv/query_soil.hpp"
+#include "unomas/msg/soil_info.hpp"
+
 
 #include <mutex>
 #include <vector>
@@ -224,7 +226,7 @@ private:
         CHECKING
     }; 
 
-    geometry_msgs::msg::Pose dronePose_; //!< next goal of the drone  //!(could be replaced with odo) !//
+    nav_msgs::msg::Odometry dronePose_; //!< next goal of the drone  //!(could be replaced with odo) !//
 
     // feedback publishers
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_; //!< publisher for state
@@ -236,7 +238,7 @@ private:
 
     // functional publishers
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr navPub_; //!< publisher for goal poses
-    rclcpp::Publisher<custom_msgs::SoilData>::SharedPtr soilPub_; //!< publisher for soil data
+    rclcpp::Publisher<unomas::msg::SoilInfo>::SharedPtr soilPub_; //!< publisher for soil data
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmdVelPub_; //!< publisher for cmd_vel
 
     // functional subscribers
@@ -250,8 +252,15 @@ private:
         std::mutex feedbackMutex; // mutex for feedback data
 
         bool emergency; // true if robot is in emergency
+        float battery;   // battery level
+        geometry_msgs::msg::Point currentPosition;   // current position of the robot
         std::string state; // current state of the robot (might need to be a string)
-        geometry_msgs::msg::Pose goal; // current goal of the robot
+        bool connection;   // true if robot is connected to base station
+        geometry_msgs::msg::Point currentGoal; // current goal of the robot
+        
+        
+        std::string current_status;    // current status of the robot
+        std::string registered_station;
 
     } feedbackData_; //!< feedback data structure containing the progress of the motion, the status of the motion and the current pose
 
@@ -281,7 +290,7 @@ private:
     {
         std::mutex soilMutex;
 
-        geometry_msgs::msg::Pose soilPose; // position of the last soil sample
+        geometry_msgs::msg::Point soilPose; // position of the last soil sample
         custom_msgs::SoilData soilData; // soil data message
 
     } soil_; // soil data
@@ -327,7 +336,7 @@ private:
         bool rowAlligned = false;
 
         // sampling
-        double minSampleDistance = 1.0;
+        const float minSampleDistance = 0.7;  //!< minimum distance between samples (also used to determine if allignment point is in already sampled row)
 
         // aligning
         State aligningState;
@@ -366,11 +375,6 @@ private:
         double bumpThreshold = 0.1;
 
     } cropData_;
-
-    const float minDistObjects = 0.4; //!< minimum distance to distinguish consecutive points between objects
-    const float minSampleDistance = 0.7;  //!< minimum distance between samples (also used to determine if allignment point is in already sampled row)
-
-
 
 };
 
