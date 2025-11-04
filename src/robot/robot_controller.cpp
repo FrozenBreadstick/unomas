@@ -1,5 +1,22 @@
 #include "robot_controller.h"
 
+/*
+
+    Things that need doing
+
+    - write sample function properly
+    - add fetch odometry
+    - fix subs and pubs in general
+    - write cmake function
+    - add emergency return to home
+
+*/
+
+// clock for loop checking
+using clock = std::chrono::steady_clock;  
+using namespace std::chrono_literals;     
+
+
 Robot::RobotController::RobotController(std::string serial_id, const std::shared_ptr<rclcpp::Node>& node) : 
     serial_id_(serial_id), 
     node_(node),

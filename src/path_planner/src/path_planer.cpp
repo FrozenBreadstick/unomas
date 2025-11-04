@@ -7,12 +7,16 @@
     Things that need doing
 
     - write sample function properly
-    - fix threading creation in goals subscriber
+    - add fetch odometry
     - fix subs and pubs in general
     - write cmake function
+    - add emergency return to home
 
 */
 
+// clock for loop checking
+using clock = std::chrono::steady_clock;  
+using namespace std::chrono_literals;     
 
 //-------------------  CONSTRUCTOR AND DESTRUCTOR  -------------------//
 
@@ -20,12 +24,16 @@
 PathPlanner::PathPlanner() : Node("path_planner")
 {
     // initialise state
-    state_ = WAITING;
+    stateData_.superState = IDLE;
 
-    // set rogue variables
-    groundLiDAR_.offset.x = 0.05;
-    groundLiDAR_.offset.y = 0;
-    groundLiDAR_.offset.z = 0.05;
+    // set rogue variables   
+    groundLiDAR_.offset.x = 0.12374;
+    groundLiDAR_.offset.y = 0.0;
+    groundLiDAR_.offset.z = 0.12374;
+
+    // set loop rate
+    const double loop_rate_hz = 10.0;   // run loop 10 times per second
+    const auto loop_period = std::chrono::duration<double>(1.0 / loop_rate_hz);
 
     // initialise feedback data
     feedbackData_.emergency = false;
@@ -39,7 +47,7 @@ PathPlanner::PathPlanner() : Node("path_planner")
 
     // initialise publishers
     navPub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
-    soilPub_ = this->create_publisher<custom_msgs::SoilData>("soil", 10);
+    soilPub_ = this->create_publisher<unomas::msg::SoilInfo>("soil", 10);
     cmdVelPub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     // initialise subscribers
@@ -170,14 +178,10 @@ void PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
             threadData_.threadExists = true;
         }
         else {                                                              // This needs to be redone
-            threadData_.navDone = true;
-            threadData_.threadExists = false;
-            threadData_.navThread->join();
-            delete threadData_.navThread;
-
-            threadData_.navThread = new std::thread(&PathPlanner::navThread, this);
-            threadData_.threadExists = true;
             threadData_.navDone = false;
+            stateData_.superState = TRAVELLING;
+            stateData_.changedState = true;
+            feedbackData_.state = "TRAVELLING";
         }
     }
 
@@ -216,7 +220,7 @@ void PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
 void PathPlanner::publishSoil()
 {
     // make message
-    custom_msgs::SoilData msg;
+    unomas::msg::SoilInfo msg;
 
     // lock soil mutex
     {
@@ -274,14 +278,14 @@ void PathPlanner::publishNavGoals()
 void PathPlanner::navThread()
 {
 
-    stateData_.superState = TRAVELLING;
-    feedbackData_.state = "TRAVELLING";
-
     while(threadData_.navDone == false)
     {
 
+        // clock loop start
+        auto loop_start = clock::now();
+
         // get odo service call to base station
-        // ... (ask mattia for advice) ...
+        dronePose_ = RobotController::getOdometry();
 
         // do state actions
         switch(stateData_.superState)
@@ -362,7 +366,7 @@ void PathPlanner::navThread()
 
                             stateData_.changedState = false;
 
-                            stateData_.initSurveyingAngle = dronePose_.theta;
+                            stateData_.initSurveyingAngle = dronePose_.yaw;
                             stateData_.startedRotating = false;
                         }
                         else {
@@ -380,7 +384,7 @@ void PathPlanner::navThread()
                             cmdVelPub_->publish(vel);
 
                             // check if robot has rotated enough
-                            if(dronePose_.theta - stateData_.initSurveyingAngle < 0.1) {
+                            if(dronePose_.yaw - stateData_.initSurveyingAngle < 0.1) {
                                 
                                 // ensure it has identified at least 2 bumps
                                 if(cropData_.cropCentres.size() > 1) {
@@ -449,7 +453,7 @@ void PathPlanner::navThread()
                             double distance = sqrt(pow(dronePose_.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.position.y - cropData_.rowCorner.y, 2));
 
                             // check if drone is facing perp to row and close to mid row
-                            if(dronePose_.theta - angle > 0.1) {
+                            if(dronePose_.yaw - angle > 0.1) {
 
                                 vel.angular = direction * manualNavData_.rotate;
                             }
@@ -467,7 +471,7 @@ void PathPlanner::navThread()
                             int direction = angle / abs(angle);
 
                             // check if drone is facing down row
-                            if(dronePose_.theta - angle > 0.1) {
+                            if(dronePose_.yaw - angle > 0.1) {
                                 vel.angular = direction * manualNavData_.rotate;
                             }
                             else { 
@@ -530,7 +534,7 @@ void PathPlanner::navThread()
                             // compute angle bearing
                             double angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
                             angleDesired = correctAngle(angleDesired);
-                            double angle = angleDesired - dronePose_.theta;
+                            double angle = angleDesired - dronePose_.yaw;
                             angle = correctAngle(angle);
                             int direction = angle / abs(angle);
 
@@ -581,7 +585,7 @@ void PathPlanner::navThread()
                             // compute angle bearing
                             double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                             angleDesired = correctAngle(angleDesired);
-                            double angle = angleDesired - dronePose_.theta;
+                            double angle = angleDesired - dronePose_.yaw;
                             angle = correctAngle(angle);
 
                             // check if drone is facing the right direction
@@ -621,7 +625,7 @@ void PathPlanner::navThread()
                         case CHECKING:
 
                             // check if drone is facing down a row
-                            if(dronePose_.theta - angle > 0.1) {
+                            if(dronePose_.yaw - angle > 0.1) {
 
                                 // check there is a row on either side of the drone using ground lidar
                                 std::vector<geometry_msgs::msg::Point> crops = determineRows(processLiDAR(copyLiDAR()));
@@ -660,7 +664,7 @@ void PathPlanner::navThread()
                                 // compute angle bearing
                                 double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                                 angleDesired = correctAngle(angleDesired);
-                                double angle = angleDesired - dronePose_.theta;
+                                double angle = angleDesired - dronePose_.yaw;
                                 angle = correctAngle(angle);
                             
                                 geometry_msgs::msg::Twist vel;
@@ -714,7 +718,7 @@ void PathPlanner::navThread()
 
                     
                     // check facing direction of drone
-                    if(dronePose_.theta - angle > 0.1) {
+                    if(dronePose_.yaw - angle > 0.1) {
                         vel.angular.z = direction * manualNavData_.rotate;
                     }
                     // check robot has not drifted too close to one side of the row
@@ -777,7 +781,17 @@ void PathPlanner::navThread()
                 break;
         }
         
-        // check if thread is done
+        // clock loop end
+        auto loop_end = clock::now();
+        auto elapsed = loop_end - loop_start;
+        auto sleep_time = loop_period - elapsed;
+
+        // sleep if necessary
+        if (sleep_time > std::chrono::nanoseconds(0)) {
+            std::this_thread::sleep_for(sleep_time);
+        }   
+
+        
     }   
 // exit main loop
 }
@@ -1017,7 +1031,11 @@ bool PathPlanner::sample()
     // lock soil mutex
     std::lock_guard<std::mutex> lock(soilData_.soilMutex);
 
+    // make message
+    custom_msgs::SoilData soilData;
+
     // make service call for soil data
+    RobotController::querySoil();
 
     // if successful
         // save soil data (pose and data)
@@ -1025,9 +1043,11 @@ bool PathPlanner::sample()
         // log error
         // return false
 
-    // make message
+    //save pose
+    soil_.soilPose = dronePose_.position;
 
     // publish soil data to base station
+    soilPub_->publish(soilData);
 
     return true;
 }
