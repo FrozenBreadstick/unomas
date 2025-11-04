@@ -7,10 +7,10 @@ main{flex:1;display:flex;justify-content:center;padding:32px 16px}
 .card{max-width:520px;width:100%;background:#101624;border:1px solid #1e2535;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
 .card h2{margin:0 0 6px 0;font-size:20px}
 .card h3{margin:16px 0 8px 0;font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:#9ba8c7}
-.odom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px;margin-top:18px}
-.odom-grid p{margin:6px 0;font-size:15px}
-.odom-grid strong{display:inline-block;width:72px;font-weight:600;color:#a8b5d8}
-.meta{margin-top:24px;font-size:14px;display:flex;flex-wrap:wrap;gap:16px;color:#a5b1cf}
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;margin-top:18px}
+.status-grid p{margin:6px 0;font-size:15px}
+.status-grid strong{display:inline-block;width:110px;font-weight:600;color:#a8b5d8}
+.status-grid span{font-variant-numeric:tabular-nums}
 .muted{color:#94a1c1;font-size:14px;margin:6px 0 0 0}
 code{background:#0a0f1a;border:1px solid #1e2535;border-radius:8px;padding:2px 6px;color:#9ba8c7}
 footer{padding:18px;text-align:center;border-top:1px solid #161c29;font-size:13px;color:#8c99ba}
