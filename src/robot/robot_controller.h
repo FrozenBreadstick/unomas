@@ -22,7 +22,7 @@ namespace Robot {
 
             std::string getStatus();
 
-            bool isEmergency();
+            bool getEmergency();
 
             int getBattery();
 
@@ -44,9 +44,9 @@ namespace Robot {
             std::vector<geometry_msgs::msg::Point> goals_;
             nav_msgs::msg::Odometry current_odometry_;
             nav_msgs::msg::Odometry last_query_odom_;
-            bool emergency_;
-            int battery_;
-            std::string current_status_;
+            // bool emergency_;
+            // int battery_;
+            // std::string current_status_;
             std::string registered_station_;
 
             geometry_msgs::msg::Point goal_position_;
@@ -106,8 +106,11 @@ namespace Robot {
                 std::mutex feedbackMutex; // mutex for feedback data
 
                 bool emergency; // true if robot is in emergency
-                std::string state; // current state of the robot (might need to be a string)
-                geometry_msgs::msg::Pose goal; // current goal of the robot
+                float battery;   // battery level
+                geometry_msgs::msg::Point currentPosition;   // current position of the robot
+                std::string state; // current state of the robot 
+                bool connection;   // true if robot is connected to base station
+                geometry_msgs::msg::Point currentGoal; // current goal of the robot
 
             } feedbackData_; //!< feedback data structure containing the progress of the motion, the status of the motion and the current pose
 

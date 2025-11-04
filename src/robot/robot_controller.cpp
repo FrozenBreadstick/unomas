@@ -67,7 +67,7 @@ void Robot::RobotController::setGoals(std::vector<geometry_msgs::msg::Point> goa
     goals_ = goals;
 }
 
-bool Robot::RobotController::isEmergency()
+bool Robot::RobotController::getEmergency()
 {
     return emergency_;
 }

@@ -254,13 +254,9 @@ private:
         bool emergency; // true if robot is in emergency
         float battery;   // battery level
         geometry_msgs::msg::Point currentPosition;   // current position of the robot
-        std::string state; // current state of the robot (might need to be a string)
+        std::string state; // current state of the robot 
         bool connection;   // true if robot is connected to base station
         geometry_msgs::msg::Point currentGoal; // current goal of the robot
-        
-        
-        std::string current_status;    // current status of the robot
-        std::string registered_station;
 
     } feedbackData_; //!< feedback data structure containing the progress of the motion, the status of the motion and the current pose
 
