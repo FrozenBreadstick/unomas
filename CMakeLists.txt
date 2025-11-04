@@ -31,6 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/DebugResponse.srv"
   "srv/StatusUpdateService.srv"
   "srv/QuerySoil.srv"
+  "srv/TerrainSoilData.srv"
   DEPENDENCIES geometry_msgs
 )
 rosidl_get_typesupport_target(custom_messages ${PROJECT_NAME} "rosidl_typesupport_cpp")

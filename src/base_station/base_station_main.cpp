@@ -15,10 +15,12 @@ int main(int argc, char* argv[])
     params->get_parameter("station_name", station_name);
 
     auto status_manager = std::make_shared<BaseStation::BaseStationStatusManager>(station_name);
+    auto terrain_soil_manager = std::make_shared<BaseStation::BaseStationTerrainSoil>(station_name);
 
     rclcpp::executors::MultiThreadedExecutor executor;
 
     executor.add_node(status_manager);
+    executor.add_node(terrain_soil_manager);
     
     executor.spin();
 
