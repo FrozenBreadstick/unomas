@@ -68,15 +68,25 @@
       <name>pine1</name>
       <pose>5.0 0.0 0 0 0 0</pose>
     </include>
-    
-    <!-- Small ground plane with grass texture -->
-    <include>
-      <uri>
-        model://crop_rows
-      </uri>
-      <name>crop_rows</name>
-      <pose>0 0 0 0 0 0</pose>
-    </include>
+
+    <!-- Visual-only box at the oak tree position -->
+    <model name="visual_box">
+      <pose>0 3 0 0 0 0</pose>
+      <link name="link">
+        <visual name="box_visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
+          </material>
+        </visual>
+        <!-- No collision element: robot will ignore for physics -->
+      </link>
+    </model>
 
   </world>
 </sdf>
