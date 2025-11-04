@@ -76,19 +76,19 @@ ament_target_dependencies(simulation_extras
   grid_map_core
 )
 
-add_executable(robot
-  src/robot/robot_main.cpp
-  src/robot/robot_controller.cpp
-  src/robot/robot_uplink.cpp
-)
-target_link_libraries(robot
-  ${custom_messages}
-)
-ament_target_dependencies(robot
-  rclcpp
-  geometry_msgs
-  nav_msgs
-)
+#add_executable(robot
+#  src/robot/robot_main.cpp
+#  src/robot/robot_controller.cpp
+#  src/robot/robot_uplink.cpp
+#)
+#target_link_libraries(robot
+#  ${custom_messages}
+#)
+#ament_target_dependencies(robot
+#  rclcpp
+#  geometry_msgs
+#  nav_msgs
+#)
 
 #install executables to lib
 install(
@@ -96,7 +96,7 @@ install(
     base_station
     ui_bridge
     simulation_extras
-    robot
+#    robot
   DESTINATION lib/${PROJECT_NAME}
 )
 
