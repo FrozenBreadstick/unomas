@@ -1,76 +1,63 @@
-const state = { odometry: null };
+const state = { packet: null };
 
 const setText = (id, value) => {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
 };
 
-const fmt = (n, digits = 3) => {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
-  return n.toFixed(digits);
+const fmtNumber = (value, digits = 2) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return value.toFixed(digits);
 };
 
+const fmtBattery = (value) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return `${value}%`;
+};
+
+const fmtEmergency = (flag) => (flag ? 'ACTIVE' : 'Clear');
+
 function render() {
-  if (!state.odometry) return;
-  const o = state.odometry;
-  setText('odom-topic', o.topic || '/odom');
-  setText('frame-id', o.frame_id || '—');
-  setText('stamp', `${o.stamp?.sec ?? 0}.${String(o.stamp?.nanosec ?? 0).padStart(9, '0')}`);
+  if (!state.packet) return;
+  const packet = state.packet;
 
-  setText('pos-x', `${fmt(o.position?.x)}`);
-  setText('pos-y', `${fmt(o.position?.y)}`);
-  setText('pos-z', `${fmt(o.position?.z)}`);
+  setText('station-name', packet.name || '—');
+  setText('current-state', packet.current_state || '—');
+  setText('battery', fmtBattery(packet.battery));
+  setText('emergency', fmtEmergency(packet.emergency));
 
-  setText('orient-roll', `${fmt(o.orientation?.roll)}`);
-  setText('orient-pitch', `${fmt(o.orientation?.pitch)}`);
-  setText('orient-yaw', `${fmt(o.orientation?.yaw)}`);
+  const current = packet.current_position || {};
+  setText('current-x', fmtNumber(current.x));
+  setText('current-y', fmtNumber(current.y));
+  setText('current-z', fmtNumber(current.z));
 
-  const lin = o.linear_velocity || {};
-  const ang = o.angular_velocity || {};
-  const linMag = Math.sqrt(
-    Math.pow(lin.x || 0, 2) +
-    Math.pow(lin.y || 0, 2) +
-    Math.pow(lin.z || 0, 2)
-  );
-  const angMag = Math.sqrt(
-    Math.pow(ang.x || 0, 2) +
-    Math.pow(ang.y || 0, 2) +
-    Math.pow(ang.z || 0, 2)
-  );
-  setText('vel-linear', fmt(linMag, 2));
-  setText('vel-angular', fmt(angMag, 2));
+  const target = packet.target_position || {};
+  setText('target-x', fmtNumber(target.x));
+  setText('target-y', fmtNumber(target.y));
+  setText('target-z', fmtNumber(target.z));
 }
 
-async function loadInitial() {
+async function refreshStatus() {
   try {
-    const res = await fetch('/api/odometry');
+    const res = await fetch('/api/status', { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    state.odometry = await res.json();
-    render();
+    const data = await res.json();
+    if (data && !data.error) {
+      state.packet = data;
+      render();
+    } else if (data?.error) {
+      throw new Error(data.error);
+    }
   } catch (err) {
-    console.error('Failed to load initial odometry:', err);
+    console.error('Failed to fetch status packet:', err);
   }
 }
 
-function setupEvents() {
-  const ev = new EventSource('/events');
-  ev.onmessage = (evt) => {
-    try {
-      const data = JSON.parse(evt.data);
-      if (data.type === 'odometry') {
-        state.odometry = data.payload;
-        render();
-      }
-    } catch (err) {
-      console.error('Bad SSE payload', err);
-    }
-  };
-  ev.onerror = () => {
-    console.warn('Lost connection to odometry stream, retrying automatically.');
-  };
+function startPolling(intervalMs = 1500) {
+  refreshStatus();
+  setInterval(refreshStatus, intervalMs);
 }
 
-window.addEventListener('load', async () => {
-  await loadInitial();
-  setupEvents();
+window.addEventListener('load', () => {
+  startPolling();
 });

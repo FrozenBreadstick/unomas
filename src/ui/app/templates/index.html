@@ -3,46 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UNO MAS – Odometry Monitor</title>
+  <title>UNO MAS – Status Monitor</title>
   <link rel="stylesheet" href="/static/css/style.css"/>
 </head>
 <body>
 <header>
-  <h1>UNO MAS <span>Odometry Monitor</span></h1>
+  <h1>UNO MAS <span>Status Monitor</span></h1>
 </header>
 
 <main>
-  <section class="card odom-card">
-    <h2>Robot Odometry</h2>
-    <p class="muted">Listening to ROS2 topic <code id="odom-topic">/odom</code>.</p>
-    <div class="odom-grid">
+  <section class="card status-card">
+    <h2>Status Update Packet</h2>
+    <p class="muted">Live data via <code>/unomas/UpdatePacket</code>.</p>
+    <div class="status-grid">
       <div>
-        <h3>Position (m)</h3>
-        <p><strong>X</strong> <span id="pos-x">—</span></p>
-        <p><strong>Y</strong> <span id="pos-y">—</span></p>
-        <p><strong>Z</strong> <span id="pos-z">—</span></p>
+        <h3>Station</h3>
+        <p><strong>Name</strong> <span id="station-name">—</span></p>
+        <p><strong>State</strong> <span id="current-state">—</span></p>
+        <p><strong>Battery</strong> <span id="battery">—</span></p>
+        <p><strong>Emergency</strong> <span id="emergency">—</span></p>
       </div>
       <div>
-        <h3>Orientation (rad)</h3>
-        <p><strong>Roll</strong> <span id="orient-roll">—</span></p>
-        <p><strong>Pitch</strong> <span id="orient-pitch">—</span></p>
-        <p><strong>Yaw</strong> <span id="orient-yaw">—</span></p>
+        <h3>Current Position (m)</h3>
+        <p><strong>X</strong> <span id="current-x">—</span></p>
+        <p><strong>Y</strong> <span id="current-y">—</span></p>
+        <p><strong>Z</strong> <span id="current-z">—</span></p>
       </div>
       <div>
-        <h3>Velocity</h3>
-        <p><strong>Linear</strong> <span id="vel-linear">—</span> m/s</p>
-        <p><strong>Angular</strong> <span id="vel-angular">—</span> rad/s</p>
+        <h3>Target Position (m)</h3>
+        <p><strong>X</strong> <span id="target-x">—</span></p>
+        <p><strong>Y</strong> <span id="target-y">—</span></p>
+        <p><strong>Z</strong> <span id="target-z">—</span></p>
       </div>
-    </div>
-    <div class="meta">
-      <p><strong>Frame</strong> <span id="frame-id">—</span></p>
-      <p><strong>Timestamp</strong> <span id="stamp">—</span></p>
     </div>
   </section>
 </main>
 
 <footer>
-  <span>UNO MAS • Odometry Feed</span>
+  <span>UNO MAS • Status Feed</span>
 </footer>
 
 <script src="/static/js/app.js"></script>
