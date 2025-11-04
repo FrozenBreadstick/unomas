@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>UNO MAS · Robot Status</title>
-  <style>
-    :root{
+<meta charset="utf-8">
+<title>UNO MAS · Robot Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
       --bg:#0b0d12; --panel:#121622; --muted:#9aa3b2; --text:#e8edf4;
       --accent:#4aa3ff; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --card:#151a28;
       --border:#202636;
@@ -38,6 +38,7 @@
       padding:6px 10px; border-radius:999px; font-size:13px; border:1px solid var(--border);
       background:#0e1422;
     }
+    #status-panel { flex: 0.2; min-height: 150px; }
     .dot{width:8px;height:8px;border-radius:50%}
     .dot.idle{background:var(--muted)}
     .dot.active{background:var(--ok)}
@@ -61,22 +62,26 @@
     .code{background:#0e1420; border:1px dashed #22304a; color:#cfe1ff; padding:10px 12px; border-radius:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; overflow:auto}
     footer{padding:18px 24px; border-top:1px solid var(--border); color:var(--muted)}
     .right{margin-left:auto}
-  </style>
+  /* Right map */
+  #map-area{flex:1; min-width: 700px;}
+  canvas{max-width:100%;height:auto;border-left:1px solid var(--border);background:#0e1420;}
+</style>
 </head>
 <body>
-  <header>
-    <h1>UNO MAS <span>· Robot Status</span></h1>
-  </header>
+<header>
+  <h1>UNO MAS · Robot Dashboard</h1>
+</header>
 
-  <main>
-    <div class="grid">
+<main>
+    
+  <div class="grid">
       <!-- Left: Primary status -->
       <section class="card">
         <div class="header-row">
           <div class="name" id="name">—</div>
           <span class="badge" id="state-badge"><span class="dot idle"></span><strong id="state">—</strong></span>
-          <span class="pill" id="emergency">Emergency: —</span>
-          <span class="pill right muted" id="updated">—</span>
+          <span class="pill" id="emergency-pill"><span class="muted">Emergency</span>: <span id="emergency">—</span></span>
+          <span class="pill right muted" id="updated-pill"><span class="muted">Updated</span>: <span id="updated">—</span></span>
         </div>
 
         <div class="section-title">Battery</div>
@@ -116,82 +121,79 @@
         </div>
       </section>
 
-      <!-- Right: Raw JSON + details -->
-      <section class="card stack">
-        <div>
-          <div class="section-title">Details</div>
-          <div class="kv">
-            <!-- <div class="muted">Service</div><div>/api/status</div> -->
-            <div class="muted">State</div><div id="state2">—</div>
-            <div class="muted">Battery</div><div id="battery2">—</div>
-            <div class="muted">Emergency</div><div id="emergency2">—</div>
-          </div>
-        </div>
-        <div>
-          <div class="section-title">Raw JSON</div>
-          <pre class="code" id="raw">Fetching…</pre>
-        </div>
-      </section>
-    </div>
-  </main>
+  <!-- MAP PANEL -->
+  <section id="map-area">
+    <canvas id="cv" width="800" height="800"></canvas>
+  </section>
+</main>
 
-  <footer>
-    UNO MAS · Status Feed · Auto-refreshing
-  </footer>
+<script>
+const WORLD_SIZE=135, HALF=WORLD_SIZE/2;
+const IMG_URL="/static/EnvTopView.png";
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const img=new Image(); img.src=IMG_URL; img.onload=draw;
+let last={name:"—",state:"IDLE",battery:0,emergency:false,pos:{x:0,y:0},tgt:{x:0,y:0}};
 
-  <script>
-    const $ = (id)=>document.getElementById(id);
-    const fmt = (n)=>Number(n).toFixed(2);
-    function setStateBadge(state){
-      const badge = $('state-badge');
-      const dot = badge.querySelector('.dot');
-      dot.className = 'dot idle';
-      if(!state){ return; }
-      const s = String(state).toUpperCase();
-      if(s.includes('IDLE')) dot.className='dot idle';
-      else if(s.includes('ERROR')||s.includes('FAULT')) dot.className='dot err';
-      else if(s.includes('WARN')||s.includes('LOW')) dot.className='dot warn';
-      else dot.className='dot active';
-    }
-    async function load(){
-      try{
-        const r = await fetch('/api/status', {cache:'no-store'});
-        const j = await r.json();
-        $('name').textContent = j.name ?? '—';
-        $('state').textContent = j.current_state ?? '—';
-        $('state2').textContent = j.current_state ?? '—';
-        setStateBadge(j.current_state);
-
-        const batt = Number(j.battery ?? 0);
-        $('battery-text').textContent = `${batt}%`;
-        $('battery2').textContent = `${batt}%`;
-        $('battery-bar').style.width = Math.min(Math.max(batt,0),100) + '%';
-
-        const emerg = Boolean(j.emergency);
-        $('emergency').textContent = `Emergency: ${emerg ? 'YES' : 'No'}`;
-        $('emergency2').textContent = emerg ? 'YES' : 'No';
-        $('emergency').style.borderColor = emerg ? 'var(--err)' : 'var(--border)';
-        $('emergency').style.background = emerg ? '#2b1116' : '#101728';
-        $('emergency').style.color = emerg ? '#ffc7cd' : 'inherit';
-
-        const cp = j.current_position || {};
-        const tp = j.target_position  || {};
-        $('cur-x').textContent = fmt(cp.x ?? 0);
-        $('cur-y').textContent = fmt(cp.y ?? 0);
-        $('cur-z').textContent = fmt(cp.z ?? 0);
-        $('tgt-x').textContent = fmt(tp.x ?? 0);
-        $('tgt-y').textContent = fmt(tp.y ?? 0);
-        $('tgt-z').textContent = fmt(tp.z ?? 0);
-
-        $('raw').textContent = JSON.stringify(j, null, 2);
-        $('updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
-      }catch(e){
-        $('raw').textContent = 'Error: ' + e;
-        $('updated').textContent = 'Update failed';
-      }
-    }
-    load();
-    setInterval(load, 1500); // auto-refresh
-  </script>
+// helpers
+function worldToScreen(x,y){const s=cv.width/WORLD_SIZE;return{x:cv.width/2+x*s,y:cv.height/2-y*s};}
+function drawGrid(){
+  const s=cv.width/WORLD_SIZE; ctx.lineWidth=1;
+  for(let u=Math.ceil(-HALF);u<=Math.floor(HALF);u++){
+    const vx=worldToScreen(u,0).x, hy=worldToScreen(0,u).y;
+    ctx.strokeStyle=(u===0)?"#52a2ff55":(u%10===0?"#ffffff22":u%5===0?"#ffffff17":"#ffffff10");
+    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,cv.height);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(cv.width,hy);ctx.stroke();
+  }
+}
+function drawBackground(){
+  const iw=img.width,ih=img.height,cw=cv.width,ch=cv.height;
+  const r=Math.max(cw/iw,ch/ih);const dw=iw*r,dh=ih*r;const dx=(cw-dw)/2,dy=(ch-dh)/2;
+  ctx.drawImage(img,dx,dy,dw,dh);
+}
+function drawDot(x,y,color,r){
+  const p=worldToScreen(x,y);
+  ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000055";ctx.stroke();
+}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(img.complete)drawBackground();
+  drawGrid();
+  drawDot(last.tgt.x,last.tgt.y,"#ffd34d",5);
+  drawDot(last.pos.x,last.pos.y,"#4aa3ff",6);
+}
+async function load(){
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"}), j=await r.json();
+    last.name=j.name; last.state=j.current_state; last.battery=+j.battery;
+    last.emergency=!!j.emergency;
+    last.pos=j.current_position; last.tgt=j.target_position;
+    updateUI();
+    draw();
+  }catch(e){console.error(e);}
+}
+function updateUI(){
+  document.getElementById("name").textContent=last.name;
+  document.getElementById("state").textContent=last.state;
+  const dot=document.querySelector(".dot");
+  dot.className="dot idle";
+  if(/ERROR|FAULT/i.test(last.state))dot.className="dot err";
+  else if(/IDLE/i.test(last.state))dot.className="dot idle";
+  else dot.className="dot active";
+  document.getElementById("battery-bar").style.width=Math.min(Math.max(last.battery,0),100)+"%";
+  document.getElementById("battery-text").textContent=last.battery+"%";
+  document.getElementById("emergency").textContent=last.emergency?"YES":"No";
+  document.getElementById("cur-x").textContent=last.pos.x.toFixed(2);
+  document.getElementById("cur-y").textContent=last.pos.y.toFixed(2);
+  document.getElementById("cur-z").textContent=last.pos.z.toFixed(2);
+  document.getElementById("tgt-x").textContent=last.tgt.x.toFixed(2);
+  document.getElementById("tgt-y").textContent=last.tgt.y.toFixed(2);
+  document.getElementById("tgt-z").textContent=last.tgt.z.toFixed(2);
+  document.getElementById("updated").textContent=new Date().toLocaleTimeString();
+}
+function resize(){const w=cv.clientWidth;cv.width=w;cv.height=w;draw();}
+window.addEventListener("resize",resize);
+resize(); load(); setInterval(load,1000);
+</script>
 </body>
 </html>
