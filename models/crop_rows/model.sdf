@@ -2,14 +2,14 @@
   <model name="crop_rows">
     <static>true</static>
     <link name="crop_rows_link">
-      <collision name="crop_rows_collision">
+      <!-- <collision name="crop_rows_collision">
         <geometry>
           <mesh>
             <uri>model://crop_rows/crop_rows.dae</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>
-      </collision>
+      </collision> -->
       <visual name="crop_rows_visual">
         <geometry>
           <mesh>

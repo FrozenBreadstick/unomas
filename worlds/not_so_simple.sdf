@@ -18,6 +18,7 @@
         <quadratic>0.001</quadratic>
       </attenuation>
       <direction>-0.5 0.1 -0.9</direction>
+      <visualize>false</visualize>
     </light>
     <gravity>0 0 -9.81</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
@@ -31,6 +32,7 @@
       <ambient>1.0 1.0 1.0</ambient>
       <background>0.8 0.8 0.8</background>
       <shadows>1</shadows>
+      <grid>false</grid>
     </scene>
 
     <!-- Initialise spherical coordinates somewhere -->
