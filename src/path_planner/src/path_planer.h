@@ -19,8 +19,6 @@
 #include <cmath>
 
 
-#endif
-
 /*!
 * @brief PathPlanner class
 * @author Connor
@@ -28,7 +26,7 @@
 * This class controls the path planning and control logic of the robots movement
 *
 */
-class PathPlanner
+class PathPlanner : public rclcpp::Node
 {
 public:
 
@@ -38,7 +36,7 @@ public:
      *
      *  @param[in] array of goal poses
      */
-    PathPlanner(geometry_msgs::msg::PoseArray goals);
+    PathPlanner();
 
 
     /*! @brief Destructor
@@ -85,7 +83,7 @@ private:
      * 
      *  @return void
      */
-    void publishGoals();
+    void publishNavGoals();
 
 
     /*! @brief publisher callback that publishes calculated velocities needed for the robot to move to cmd_vel
@@ -94,7 +92,7 @@ private:
      * 
      *  @return void
      */
-    void publishVelocities();
+    void publishCmdVel(geometry_msgs::msg::Twist vel);
 
 
     /*! @brief publisher callback that publishes the collected soil data to the base station
@@ -129,7 +127,7 @@ private:
      * 
      *  @return void
      */
-    void subscribeObstacles(custom_msgs::Obstacles obstacles);
+    void subscribeObstacles(sensor_msgs::msg::LaserScan data);
 
 //-------------------  OTHER FUNCTIONS AND THREADS -----------------//
 
@@ -171,14 +169,7 @@ private:
      *
      *  @return vector of points
      */
-    std::vector<geometry_msgs::msg::Point> copyLiDAR();
-
-
-    /*! @brief make local copy of detected crop rows
-     *
-     *  @return vector of points
-     */
-    std::vector<geometry_msgs::msg::Point> copyObjects();
+    sensor_msgs::msg::LaserScan copyLiDAR();
 
 
     /*! @brief convert raw lidar data into global vector of points
@@ -187,7 +178,7 @@ private:
      * 
      *  @return vector of points
      */
-    std::vector<geometry_msgs::msg::Point> processLiDAR(std::vector<geometry_msgs::msg::Point> lidar);
+    std::vector<geometry_msgs::msg::Point> processLiDAR(sensor_msgs::msg::LaserScan lidar);
 
 
     /*! @brief determine number of crop rows adjacent to the drone
@@ -197,6 +188,13 @@ private:
      *  @return std::vector<geometry_msgs::msg::Point> - vector of points
      */
     std::vector<geometry_msgs::msg::Point> determineRows(std::vector<geometry_msgs::msg::Point> lidar);
+
+
+    /*! @brief calls sample service, publishes soil data and updates last soil point
+     *
+     *  @return bool - true if successful
+     */
+    bool sample();
 
 
 private:
@@ -215,7 +213,7 @@ private:
         ROTATING,
         CALCULATING,
         S_MOVING,
-        EXITING
+        EXITING,
 
         // ALLIGNING SUB STATES
         LEAVING,
@@ -225,8 +223,26 @@ private:
         ENTERING,
         CHECKING
     }; 
-    
-    State state_; //!< current state of the robot
+
+    geometry_msgs::msg::Pose dronePose_; //!< next goal of the drone  //!(could be replaced with odo) !//
+
+    // feedback publishers
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_; //!< publisher for state
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr emergencyPub_; //!< publisher for emergency
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goalPub_; //!< publisher for current goal poses
+
+    //rclcpp::WallTimer<CallbackT>::SharedPtr timer_; //!< timer for feedback publishers
+    rclcpp::TimerBase::SharedPtr timer_; //!< timer for feedback publishers
+
+    // functional publishers
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr navPub_; //!< publisher for goal poses
+    rclcpp::Publisher<custom_msgs::SoilData>::SharedPtr soilPub_; //!< publisher for soil data
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmdVelPub_; //!< publisher for cmd_vel
+
+    // functional subscribers
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr goalsSub_; //!< subscriber for goal poses
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr obstaclesSub_; //!< subscriber for obstacles
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr groundLiDARSub_; //!< subscriber for ground LiDAR
     
 
     struct feedbackData
@@ -244,7 +260,9 @@ private:
     {
         std::mutex objectMutex;
 
-        std::vector<geometry_msgs::msg::Point> objectPoints;   // crop row points from ayberk (might need to be a custom message)
+        geometry_msgs::msg::PoseArray objectPoints;   // obstacle points from ayberk (might need to be a custom message)
+
+        double minRange = 0.4;
    
     } objects_; // vector of object points
 
@@ -254,6 +272,7 @@ private:
         std::mutex groundLiDARMutex;
 
         sensor_msgs::msg::LaserScan data;   // data from the ground facing LiDAR
+        geometry_msgs::msg::Point offset;   // offset of the ground facing LiDAR from the drone
 
     } groundLiDAR_; // vector of object points
  
@@ -264,8 +283,6 @@ private:
 
         geometry_msgs::msg::Pose soilPose; // position of the last soil sample
         custom_msgs::SoilData soilData; // soil data message
-
-        std::vector<geometry_msgs::msg::Point> sampledPoints; // vector of points that have been sampled
 
     } soil_; // soil data
 
@@ -284,40 +301,21 @@ private:
         
     } goals_; // goals data
 
-    geometry_msgs::msg::Pose robotPose_; //!< next goal of the drone  //!(could be replaced with odo) !//
-
-    // feedback publishers
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_; //!< publisher for state
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr emergencyPub_; //!< publisher for emergency
-    rclcpp::Publisher<geometry_msgs/msg::PoseStamped>::SharedPtr goalPub_; //!< publisher for current goal poses
-
-    rclcpp::WallTimer<CallbackT>::SharedPtr timer_; //!< timer for feedback publishers
-
-    // functional publishers
-    rclcpp::Publisher<geometry_msgs/msg/PoseStamped>::SharedPtr navPub_; //!< publisher for goal poses
-    rclcpp::Publisher<custom_msgs::SoilData>::SharedPtr soilPub_; //!< publisher for soil data
-    rclcpp::Publisher<geometry_msgs/msg/Twist>::SharedPtr cmdVelPub_; //!< publisher for cmd_vel
-
-    // functional subscribers
-    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr goalsSub_; //!< subscriber for goal poses
-    rclcpp::Subscription<custom_msgs::Obstacles>::SharedPtr obstaclesSub_; //!< subscriber for obstacles
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr groundLiDARSub_; //!< subscriber for ground LiDAR
-
     struct threadData
     {
-        std::thread navThread; //!< thread for the navigation
-        atomic_bool navDone; //!< atomic boolean for the navigation thread
-        atomic_bool threadExists; //!< atomic boolean for the navigation thread
+        std::thread* navThread; //!< thread for the navigation
+        std::atomic_bool navDone; //!< atomic boolean for the navigation thread
+        std::atomic_bool threadExists; //!< atomic boolean for the navigation thread
 
     } threadData_; //!< thread data
 
 
-    struct manuelNavData
+    struct manualNavData
     {
         const float rotate = 0.1;
         const float linear = 0.1;
 
-    } vel_; //!< manuel nav data
+    } manualNavData_; //!< manual nav data
 
 
     struct stateData
@@ -333,7 +331,7 @@ private:
 
         // aligning
         State aligningState;
-        geometry_msgs::msg::Point checkPoint;
+        geometry_msgs::msg::Point checkpoint;
 
         // waiting
 
@@ -365,6 +363,8 @@ private:
 
         bool leftTurnRow = true;
 
+        double bumpThreshold = 0.1;
+
     } cropData_;
 
     const float minDistObjects = 0.4; //!< minimum distance to distinguish consecutive points between objects
@@ -372,4 +372,6 @@ private:
 
 
 
-}
+};
+
+#endif

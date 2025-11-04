@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(local_adjustment)
+project(field_sampling)
 
 set(CMAKE_BUILD_RPATH "$ORIGIN")
 set(CMAKE_INSTALL_RPATH "$ORIGIN")

@@ -2,20 +2,35 @@
 #include "path_planer.h"
 
 
+/*
+
+    Things that need doing
+
+    - write sample function properly
+    - fix threading creation in goals subscriber
+    - fix subs and pubs in general
+    - write cmake function
+
+*/
+
+
 //-------------------  CONSTRUCTOR AND DESTRUCTOR  -------------------//
 
 // constructor
-PathPlanner::PathPlanner(geometry_msgs::msg::PoseArray goals, geometry_msgs::msg::Pose currentPose)
+PathPlanner::PathPlanner() : Node("path_planner")
 {
     // initialise state
     state_ = WAITING;
 
-    // get current pose of drone
+    // set rogue variables
+    groundLiDAR_.offset.x = 0.05;
+    groundLiDAR_.offset.y = 0;
+    groundLiDAR_.offset.z = 0.05;
 
     // initialise feedback data
     feedbackData_.emergency = false;
     feedbackData_.state = "waiting";
-    feedbackData_.goal = [];
+    feedbackData_.goal = geometry_msgs::msg::Pose();
 
     // initialise feedback publishers
     statePub_ = this->create_publisher<std_msgs::msg::String>("/state", 10);
@@ -23,9 +38,9 @@ PathPlanner::PathPlanner(geometry_msgs::msg::PoseArray goals, geometry_msgs::msg
     goalPub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal", 10);
 
     // initialise publishers
-    navPub_ = this->create_publisher<geometry_msgs/msg/PoseStamped>("/goal_pose", 10);
+    navPub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
     soilPub_ = this->create_publisher<custom_msgs::SoilData>("soil", 10);
-    cmdVelPub_ = this->create_publisher<geometry_msgs/msg/Twist>("/cmd_vel", 10);
+    cmdVelPub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
     // initialise subscribers
     goalsSub_ = this->create_subscription<geometry_msgs::msg::PoseArray>("/goals", 10, std::bind(&PathPlanner::subscribeGoals, this, std::placeholders::_1));
@@ -34,7 +49,7 @@ PathPlanner::PathPlanner(geometry_msgs::msg::PoseArray goals, geometry_msgs::msg
 
 
     // initialise wall timer for feedback pubs
-    Timer_ = this->create_wall_timer(500ms, std::bind(&PathPlanner::timer_callback, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(500), std::bind(&PathPlanner::timer_callback, this));
 }
 
 
@@ -42,16 +57,18 @@ PathPlanner::PathPlanner(geometry_msgs::msg::PoseArray goals, geometry_msgs::msg
 PathPlanner::~PathPlanner()
 {
     // close nav thread
-    threadData_.navDone = true;
-    threadData_.navThread.join();
-    delete navThread_;
+    if(threadData_.navThread->joinable() == true) {
+        threadData_.navDone = true;
+        threadData_.navThread->join();
+        delete threadData_.navThread;
+    }
 }
 
 
 //-------------------  FEEDBACK PUBLISHERS  -------------------//
 
 // publisher callback that publishes the current state of the robot to the base station
-PathPlanner::publishState(std::string state)
+void PathPlanner::publishState()
 {
     // make message
     std_msgs::msg::String msg;
@@ -60,7 +77,7 @@ PathPlanner::publishState(std::string state)
     {
         std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
-        msg.data = feedBackData_.state;
+        msg.data = feedbackData_.state;
     }
 
     // log message
@@ -74,7 +91,7 @@ PathPlanner::publishState(std::string state)
 
 
 // publisher callback that publishes the emergency state of the robot to the base station
-PathPlanner::publishEmergency()
+void PathPlanner::publishEmergency()
 {
     // make message
     std_msgs::msg::Bool msg;
@@ -83,11 +100,11 @@ PathPlanner::publishEmergency()
     {
         std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
-        msg.data = feedBackData_.emergency;
+        msg.data = feedbackData_.emergency;
     }
 
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.data.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.data ? "true" : "false");
 
     // publish message
     emergencyPub_->publish(msg);
@@ -95,7 +112,7 @@ PathPlanner::publishEmergency()
 
 
 // publisher callback that publishes the current goal of the robot to the base station
-PathPlanner::publishGoal()
+void PathPlanner::publishGoal()
 {
     // make message
     geometry_msgs::msg::PoseStamped msg;
@@ -104,11 +121,11 @@ PathPlanner::publishGoal()
     {
         std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
-        msg.pose = feedBackData_.goal;
+        msg.pose = feedbackData_.goal;
     }
 
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.pose.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing goal: (%.2f, %.2f)", msg.pose.position.x, msg.pose.position.y);
 
     // publish message
     goalPub_->publish(msg);
@@ -116,7 +133,7 @@ PathPlanner::publishGoal()
 
 
 // timer callback that calls feedback publishers
-PathPlanner::timer_callback()
+void PathPlanner::timer_callback()
 {
     // publish state
     publishState();
@@ -131,7 +148,7 @@ PathPlanner::timer_callback()
 //-------------------  FUNCTIONAL SUBSCRIBERS  -------------------//
 
 // subscriber callback that listens for goal pose instruction from base station
-PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
+void PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
 {
     // lock mutex and save goals
     {
@@ -142,23 +159,23 @@ PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
     }
 
 
-    if(goalsData_.rawGoals.size() > 0) {
+    if(goalsData_.rawGoals.poses.size() > 0) {
 
         // save crop field corner
-        cropData_.rowCorner = goalsData_.rawGoals.back().position;
+        cropData_.rowCorner = goalsData_.rawGoals.poses.back().position;
 
         // start new nav thread and close previous nav thread if not finished
         if(threadData_.threadExists == false) {
-            threadData_.navThread = std::thread(&PathPlanner::navThread, this);
+            threadData_.navThread = new std::thread(&PathPlanner::navThread, this);
             threadData_.threadExists = true;
         }
-        else {
+        else {                                                              // This needs to be redone
             threadData_.navDone = true;
             threadData_.threadExists = false;
-            threadData_.navThread.join();
-            delete navThread_;
+            threadData_.navThread->join();
+            delete threadData_.navThread;
 
-            threadData_.navThread = std::thread(&PathPlanner::navThread, this);
+            threadData_.navThread = new std::thread(&PathPlanner::navThread, this);
             threadData_.threadExists = true;
             threadData_.navDone = false;
         }
@@ -170,19 +187,19 @@ PathPlanner::subscribeGoals(geometry_msgs::msg::PoseArray goals)
 
 // This whole subscriber needs fixing
 // subscriber callback that listens for obstacles from detection node
-PathPlanner::subscribeObstacles(sensor_msgs::msg::LaserScan data)
+void PathPlanner::subscribeObstacles(geometry_msgs::msg::PoseArray obstacles)
 {
     // lock mutex and save data
     {
     std::lock_guard<std::mutex> lock(objects_.objectMutex);
     
-    objects_.objectPoints = data.ranges;
+    objects_.objectPoints = obstacles.poses;
     }
 }
 
 
 // subscriber callback that listens for ground LiDAR
-PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
+void PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
 {
     // lock mutex and save laser data
     {
@@ -196,7 +213,7 @@ PathPlanner::subscribeGroundLiDAR(sensor_msgs::msg::LaserScan laser)
 //-------------------  FUNCTIONAL PUBLISHERS  -------------------//
 
 // publisher callback that publishes soil data
-PathPlanner::publishSoil()
+void PathPlanner::publishSoil()
 {
     // make message
     custom_msgs::SoilData msg;
@@ -205,12 +222,12 @@ PathPlanner::publishSoil()
     {
         std::lock_guard<std::mutex> lock(soilData_.soilMutex);
 
-        msg.soilPose = feedBackData_.soilPose;
-        msg.soilData = feedBackData_.soilData;
+        msg.soilPose = soil_.soilPose;
+        msg.soilData = soil_.soilData;
     }
 
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.soilData.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing soil %s", msg.soilData.c_str());
 
     // publish message
     soilPub_->publish(msg);
@@ -218,10 +235,11 @@ PathPlanner::publishSoil()
 
 
 // publisher callback that publishes velocity commands
-PathPlanner::publishCmdVel(geometry_msgs::msg::Twist vel)
+void PathPlanner::publishCmdVel(geometry_msgs::msg::Twist vel)
 {
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing %s", vel.c_str())
+    //RCLCPP_INFO(this->get_logger(), "Publishing %s", vel.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing Twist linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)", vel.linear.x, vel.linear.y, vel.linear.z, vel.angular.x, vel.angular.y, vel.angular.z);
 
     // publish message
     cmdVelPub_->publish(vel);
@@ -230,7 +248,7 @@ PathPlanner::publishCmdVel(geometry_msgs::msg::Twist vel)
 
 
 // publisher callback that publishes goal poses to Nav2
-PathPlanner::publishGoals()
+void PathPlanner::publishNavGoals()
 {
     // make message
     geometry_msgs::msg::PoseStamped msg;
@@ -243,7 +261,7 @@ PathPlanner::publishGoals()
     }
 
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.pose.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing Nav goal (%.2f, %.2f)", msg.pose.position.x, msg.pose.position.y);
 
     // publish message
     navPub_->publish(msg);
@@ -253,7 +271,7 @@ PathPlanner::publishGoals()
 
 
 // main threaded loop that runs the planner (4 states: travelling, aligning, sampling, emergency)
-PathPlanner::navThread()
+void PathPlanner::navThread()
 {
 
     stateData_.superState = TRAVELLING;
@@ -279,14 +297,14 @@ PathPlanner::navThread()
                         // set goal
                         goals_.currentGoal = goals_.droneGoals.at(0);
                         goals_.commuting = true;
-                        publishGoal();
+                        /* ...Publish goal to nav2... */
                     }
                     else {
 
-                        distance = sqrt(pow(goals_.currentGoal.position.x - robotPose_.position.x, 2) + pow(goals_.currentGoal.position.y - robotPose_.position.y, 2));
+                        double distance = sqrt(pow(goals_.currentGoal.position.x - dronePose_.position.x, 2) + pow(goals_.currentGoal.position.y - dronePose_.position.y, 2));
 
                         // check goal has been reached
-                        if( distance < 0.05) {
+                        if(distance < 0.05) {
                             // set new goal
                             goals_.droneGoals.erase(goals_.droneGoals.begin());
                             goals_.commuting = false;
@@ -308,7 +326,8 @@ PathPlanner::navThread()
                             }
                             // if counter is greater than 10 then move to emergency
                             if(goals_.emergencyCounter > 10) {
-                                state_ = EMERGENCY;
+                                stateData_.superState = EMERGENCY;
+                                stateData_.changedState = true;
                                 feedbackData_.state = "EMERGENCY";
                                 break;
                             }
@@ -322,8 +341,9 @@ PathPlanner::navThread()
                     }
                 }
                 else {
-                    state_ = ALLIGNING;
-                    feedbackData_.state = "ALLIGNING";
+                    stateData_.superState = ALIGNING;
+                    stateData_.changedState = true;
+                    feedbackData_.state = "ALIGNING";
                 }
 
 
@@ -342,13 +362,17 @@ PathPlanner::navThread()
 
                             stateData_.changedState = false;
 
-                            stateData_.initSurveyingAngle = robotPose_.theta;
+                            stateData_.initSurveyingAngle = dronePose_.theta;
                             stateData_.startedRotating = false;
                         }
                         else {
                         
-                            // save points in crop centres if they are not already saved
-                            collectObjectPoints();
+                            // identify bumps and save points in crop centres if there are at least 2 bumps
+                            std::vector<geometry_msgs::msg::Point> rows = locateInitialRows(processLiDAR(copyLiDAR()));
+
+                            if(rows.size() > 1) {
+                                cropData_.cropCentres = rows;
+                            }
 
                             // rotate robot
                             geometry_msgs::msg::Twist vel;
@@ -356,12 +380,19 @@ PathPlanner::navThread()
                             cmdVelPub_->publish(vel);
 
                             // check if robot has rotated enough
-                            if(robotPose_.theta - stateData_.initSurveyingAngle < 0.1) {
+                            if(dronePose_.theta - stateData_.initSurveyingAngle < 0.1) {
                                 
-                                // ensure it has started rotating
-                                if(stateData_.startedRotating == true) {
+                                // ensure it has identified at least 2 bumps
+                                if(cropData_.cropCentres.size() > 1) {
 
-                                    stateData_.surveyingState = CALCULATING;
+                                    // ensure it has started rotating
+                                    if(stateData_.startedRotating == true) {
+
+                                        stateData_.surveyingState = CALCULATING;
+                                    }
+                                }
+                                else {
+                                    stateData_.startedRotating = false;
                                 }
                             }
                             else {
@@ -386,7 +417,7 @@ PathPlanner::navThread()
                         // calculate crop field side direction vectors
                         cropData_.rowParallel = cropData_.currentCrop - dronePose_.position;
                         
-                        magnitude = sqrt(pow(cropData_.rowParallel.x, 2) + pow(cropData_.rowParallel.y, 2));
+                        double magnitude = sqrt(pow(cropData_.rowParallel.x, 2) + pow(cropData_.rowParallel.y, 2));
                         cropData_.rowParallel.x = cropData_.rowParallel.x / magnitude;
                         cropData_.rowParallel.y = cropData_.rowParallel.y / magnitude;
                 
@@ -410,12 +441,12 @@ PathPlanner::navThread()
 
                         if(stateData_.rowAlligned == false) {
                             // calculate angle between rowPerpendicular and drone
-                            angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                            double angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
                             angle = correctAngle(angle);
-                            direction = angle / abs(angle);
+                            int direction = angle / abs(angle);
 
                             // calculate magnitude of distance from corner to drone
-                            distance = sqrt(pow(dronePose_.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.position.y - cropData_.rowCorner.y, 2));
+                            double distance = sqrt(pow(dronePose_.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.position.y - cropData_.rowCorner.y, 2));
 
                             // check if drone is facing perp to row and close to mid row
                             if(dronePose_.theta - angle > 0.1) {
@@ -431,9 +462,9 @@ PathPlanner::navThread()
                         }
                         else {
                             // calculate angle between rowParallel and drone
-                            angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                             angle = correctAngle(angle);
-                            direction = angle / abs(angle);
+                            int direction = angle / abs(angle);
 
                             // check if drone is facing down row
                             if(dronePose_.theta - angle > 0.1) {
@@ -452,10 +483,11 @@ PathPlanner::navThread()
                     case EXITING:
                         
                         // reset state data
-                        stateData_.state = SAMPLING;
+                        stateData_.superState = SAMPLING;
                         stateData_.surveyingState = ROTATING;
                         stateData_.changedState = true;
                         stateData_.rowAlligned = false;
+                        feedbackData_.state = "SAMPLING";
 
                         break;
                 }
@@ -469,7 +501,7 @@ PathPlanner::navThread()
                     stateData_.changedState = false;
                     
                     stateData_.aligningState = LEAVING;
-                    stateData_.checkPoint = dronePose_.position;
+                    stateData_.checkpoint = dronePose_.position;
                 }
                 else {
                     switch(stateData_.aligningState)
@@ -489,7 +521,7 @@ PathPlanner::navThread()
                             }
                             else {
                                 stateData_.aligningState = TURNING_PERP;
-                                stateData_.checkPoint = dronePose_.position;
+                                stateData_.checkpoint = dronePose_.position;
                             }
 
                             break;
@@ -497,9 +529,9 @@ PathPlanner::navThread()
                         case TURNING_PERP:
                             // compute angle bearing
                             double angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
-                            double angleDesired = correctAngle(angleDesired);
+                            angleDesired = correctAngle(angleDesired);
                             double angle = angleDesired - dronePose_.theta;
-                            double angle = correctAngle(angle);
+                            angle = correctAngle(angle);
                             int direction = angle / abs(angle);
 
                             // check if drone is facing the right direction
@@ -548,9 +580,9 @@ PathPlanner::navThread()
                         
                             // compute angle bearing
                             double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
-                            double angleDesired = correctAngle(angleDesired);
+                            angleDesired = correctAngle(angleDesired);
                             double angle = angleDesired - dronePose_.theta;
-                            double angle = correctAngle(angle);
+                            angle = correctAngle(angle);
 
                             // check if drone is facing the right direction
                             if(angle > 0.1) {
@@ -592,24 +624,27 @@ PathPlanner::navThread()
                             if(dronePose_.theta - angle > 0.1) {
 
                                 // check there is a row on either side of the drone using ground lidar
-                                int crops = determineRows(processLiDAR(copyLiDAR()));
+                                std::vector<geometry_msgs::msg::Point> crops = determineRows(processLiDAR(copyLiDAR()));
                                 
                                 // if there is a row on either side of the drone
                                 if(crops.size() == 2) {
                                     // we are in a row move to sampling
-                                    stateData_.state = SAMPLING;
+                                    stateData_.superState = SAMPLING;
                                     stateData_.changedState = true;
+                                    feedbackData_.state = "SAMPLING";
                                 }
                                 else if(crops.size() == 1) {
                                     // we are done in this field switch to idle
-                                    stateData_.state = IDLE;
+                                    stateData_.superState = IDLE;                    
                                     stateData_.changedState = true;
-                                    navThreadDone = true;
+                                    feedbackData_.state = "IDLE";
+                                    theadData_.navDone = true;
                                 }
                                 else {
                                     // we are not in a row and there has been an issue switch to emergency
-                                    stateData_.state = EMERGENCY;
+                                    stateData_.superState = EMERGENCY;
                                     stateData_.changedState = true;
+                                    feedbackData_.state = "EMERGENCY";
                                 }
                                  
                             }
@@ -624,9 +659,9 @@ PathPlanner::navThread()
                             
                                 // compute angle bearing
                                 double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
-                                double angleDesired = correctAngle(angleDesired);
+                                angleDesired = correctAngle(angleDesired);
                                 double angle = angleDesired - dronePose_.theta;
-                                double angle = correctAngle(angle);
+                                angle = correctAngle(angle);
                             
                                 geometry_msgs::msg::Twist vel;
                                 vel.angular.z = direction * manualNavData_.rotate;
@@ -650,7 +685,7 @@ PathPlanner::navThread()
                     
                     stateData_.changedState = false;
                     
-                    // sample function
+                    sample();
                 }
                 else {
                     geometry_msgs::msg::Twist vel;
@@ -658,22 +693,23 @@ PathPlanner::navThread()
                     // drone allignment check and lidar processing
                     double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                     angle = correctAngle(angle);
-                    direction = angle / abs(angle);
+                    int direction = angle / abs(angle);
 
                     // process lidar
-                    rows = determineRows(processLiDAR(copyLiDAR()));
+                    std::vector<geometry_msgs::msg::Point> rows = determineRows(processLiDAR(copyLiDAR()));
 
                     // check still in row
                     if(rows.size() < 2) {
-                        stateData_.state = ALIGNING;
+                        stateData_.superState = ALIGNING;
                         stateData_.changedState = true;
+                        feedbackData_.state = "ALIGNING";
                         break;
                     }
                     else {
-                        distLeft = sqrt(pow(rows.at(0).x - dronePose_.position.x, 2) + pow(rows.at(0).y - dronePose_.position.y, 2));
-                        distRight = sqrt(pow(rows.at(1).x - dronePose_.position.x, 2) + pow(rows.at(1).y - dronePose_.position.y, 2));
+                        double distLeft = sqrt(pow(rows.at(0).x - dronePose_.position.x, 2) + pow(rows.at(0).y - dronePose_.position.y, 2));
+                        double distRight = sqrt(pow(rows.at(1).x - dronePose_.position.x, 2) + pow(rows.at(1).y - dronePose_.position.y, 2));
 
-                        diff = distLeft - distRight;
+                        double diff = distLeft - distRight;
                     }
 
                     
@@ -686,11 +722,22 @@ PathPlanner::navThread()
                         
                         // check direction needed and set velocity
                         if(diff > 0) {
-                            vel.linear = manualNavData_.linear;
+                            vel.linear = manualNavData_.rotate;
                         }
                         else {
-                            vel.linear = -1 * manualNavData_.linear;
+                            vel.linear = -1 * manualNavData_.rotate;
                         }
+                    }
+
+                    // check if drone is in range of an obstacle switch to emergency
+                    if(isObstacleInRange(dronePose_.position) == true) {
+                        vel.linear = 0;
+                        
+                        // switch to emergency
+                        stateData_.superState = EMERGENCY;
+                        stateData_.changedState = true;
+                        feedbackData_.state = "EMERGENCY";
+                        break;
                     }
 
                     // check distance from last sample spot
@@ -699,7 +746,7 @@ PathPlanner::navThread()
                     // if distance greater than X
                     if(distance > stateData_.minSampleDistance) {
                         
-                        // sample function
+                        sample();
                     
                     }
                     else {
@@ -756,7 +803,7 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::twoClosest(std::vector<geome
 {
     // save closest 2 points
     geometry_msgs::msg::Point closestPoint = closestPoints.at(0);
-    double closestDist = sqrt(pow(closestPoint.x - robotPose_.position.x, 2) + pow(closestPoint.y - robotPose_.position.y, 2));
+    double closestDist = sqrt(pow(closestPoint.x - dronePose_.position.x, 2) + pow(closestPoint.y - dronePose_.position.y, 2));
     geometry_msgs::msg::Point nextClosestPoint = closestPoint;
     double nextClostestDist = closestDist;
     int pointTracker = 0;
@@ -765,7 +812,8 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::twoClosest(std::vector<geome
         if(pointTracker != 0) {
 
             // check if new closest point
-            dist = sqrt(pow(point.x - robotPose_.position.x, 2) + pow(point.y - robotPose_.position.y, 2));
+            double dist = sqrt(pow(point.x - dronePose_.position.x, 2) + pow(point.y - dronePose_.position.y, 2));
+
             if(dist < closestDist) {    // if new closest point
                 nextClosestPoint = closestPoint;
                 nextClostestDist = closestDist;
@@ -811,33 +859,16 @@ geometry_msgs::msg::Point PathPlanner::calculateAllignmentPoint(std::vector<geom
 
 
 // make local copy of lidar data
-std::vector<geometry_msgs::msg::Point> PathPlanner::copyLiDAR()
+sensor_msgs::msg::LaserScan PathPlanner::copyLiDAR()
 {
-    std::vector<geometry_msgs::msg::Point> crops;
+    sensor_msgs::msg::LaserScan crops;
 
     // lock objects mutex
     {
         std::lock_guard<std::mutex> lock(groundLiDAR_.groundLiDARMutex);
 
         // pushback crop objects into vector
-        crops = groundLiDAR_.data.ranges;
-    }
-
-    return crops;
-}
-
-
-// make local copy of detected crop rows
-std::vector<geometry_msgs::msg::Point> PathPlanner::copyObjects()
-{
-    std::vector<geometry_msgs::msg::Point> crops;
-
-    // lock objects mutex
-    {
-        std::lock_guard<std::mutex> lock(objects_.groundLiDARMutex);
-
-        // pushback crop objects into vector
-        crops = objects_.groundLiDAR.data.ranges;
+        crops = groundLiDAR_.data;
     }
 
     return crops;
@@ -845,38 +876,39 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::copyObjects()
 
 
 // convert raw lidar data into global vector of points
-std::vector<geometry_msgs::msg::Point> PathPlanner::processLiDAR(std::vector<geometry_msgs::msg::Point> lidar) 
+std::vector<geometry_msgs::msg::Point> PathPlanner::processLiDAR(sensor_msgs::msg::LaserScan lidar)
 {
     std::vector<geometry_msgs::msg::Point> globalCartesian;
+    globalCartesian.resize(lidar.ranges.size());
 
     // convert polar to global
-    for(int i = 0; i < lidar.size(); i++) {
+    for(int i = 0; i < lidar.ranges.size(); i++) {
 
         geometry_msgs::msg::Point localCart;
 
-        theta = lidar.angle_min + lidar.angle_increment * i;
+        double theta = lidar.angle_min + lidar.angle_increment * i;
 
         // convert from polar to cartesian
-        localCart.x = lidar.at(i) * cos(theta);
-        localCart.y = lidar.at(i) * sin(theta);
+        localCart.x = lidar.ranges.at(i) * cos(theta);
+        localCart.y = lidar.ranges.at(i) * sin(theta);
         localCart.z = 0;
 
         // apply LiDAR tilt correction (45 degrees down on x axis)
-        localCart.y = LocalCart.y * cos(M_PI/4);
-        LocalCart.z = LocalCart.y * sin(-M_PI/4);
+        localCart.y = localCart.y * cos(M_PI/4);
+        localCart.z = localCart.y * sin(-M_PI/4);
 
         // convert from lidar to robot position frame
-        LocalCart.x = LocalCart.x - LidarOffset.x;
-        LocalCart.y = LocalCart.y - LidarOffset.y;
-        LocalCart.z = LocalCart.z - LidarOffset.z;
+        localCart.x = localCart.x - groundLiDAR_.offset.x;
+        localCart.y = localCart.y - groundLiDAR_.offset.y;
+        localCart.z = localCart.z - groundLiDAR_.offset.z;
 
         // convert from robot to global frame
-        LocalCart.x = LocalCart.x + dronePose_.position.x;
-        LocalCart.y = LocalCart.y + dronePose_.position.y;
-        LocalCart.z = LocalCart.z + dronePose_.position.z;
+        localCart.x = localCart.x + dronePose_.position.x;
+        localCart.y = localCart.y + dronePose_.position.y;
+        localCart.z = localCart.z + dronePose_.position.z;
 
         // add to vector
-        globalCartesian.at(i) = LocalCart;
+        globalCartesian.at(i) = localCart;
     }
 
     return globalCartesian;
@@ -891,7 +923,7 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::determineRows(std::vector<ge
 
     bool newRow = true;
     double maxZ = 0;
-    double maxIndex = 0;
+    int maxIndex = 0;
 
     // check number of bumps greater than bum threshold
     for(int i = 0; i < lidar.size(); i++) {
@@ -903,7 +935,7 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::determineRows(std::vector<ge
         if(distance > cropData_.midRowScaler * 1.5) {
 
             // check it is a genuine bump
-            if(lidar.at(i).z > bumpThreshold) {
+            if(lidar.at(i).z > cropData_.bumpThreshold) {
 
                 // check if new row
                 if(newRow == true) {
@@ -934,4 +966,89 @@ std::vector<geometry_msgs::msg::Point> PathPlanner::determineRows(std::vector<ge
 }
 
 
-// identify the 2 closest 
+// identify initial crop field direction vectors
+// determine number of rows adjacent to the drone
+std::vector<geometry_msgs::msg::Point> PathPlanner::locateInitialRows(std::vector<geometry_msgs::msg::Point> lidar)
+{
+    std::vector<geometry_msgs::msg::Point> rows;
+
+    bool newRow = true;
+    double maxZ = 0;
+    int maxIndex = 0;
+
+    // check number of bumps greater than bum threshold
+    for(int i = 0; i < lidar.size(); i++) {
+    
+        // check it is a genuine bump
+        if(lidar.at(i).z > cropData_.bumpThreshold) {
+
+            // check if new row
+            if(newRow == true) {
+
+                // set new max
+                maxZ = lidar.at(i).z;
+                maxIndex = i;
+                newRow = false;
+            }
+            else {
+
+                // check if new max
+                if(maxZ < lidar.at(i).z) {
+                    maxZ = lidar.at(i).z;
+                    maxIndex = i;
+                }
+            }
+        }
+        else {
+            newRow = true;
+            rows.push_back(lidar.at(maxIndex));
+        }
+    }
+
+    return rows;
+
+}
+
+
+// sample soil function
+bool PathPlanner::sample()
+{
+
+    // lock soil mutex
+    std::lock_guard<std::mutex> lock(soilData_.soilMutex);
+
+    // make service call for soil data
+
+    // if successful
+        // save soil data (pose and data)
+    // else 
+        // log error
+        // return false
+
+    // make message
+
+    // publish soil data to base station
+
+    return true;
+}
+
+
+// check if any known obstacles are within range of the drone
+bool PathPlanner::isObstacleInRange(geometry_msgs::msg::Point point)
+{
+    // lock obstacles mutex
+    {
+        std::lock_guard<std::mutex> lock(objects_.objectMutex);
+
+        geometry_ msgs::PoseArray objects = objects_.objectPoints;
+    }
+
+        // check if any obstacles are within range of the drone
+        for(auto obstacle : objects) {
+            if(sqrt(pow(point.x - obstacle.position.x, 2) + pow(point.y - obstacle.position.y, 2)) < objects_.minRange) {
+                return true;
+            }
+        }
+
+    return false;
+}
