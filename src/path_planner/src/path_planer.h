@@ -226,7 +226,7 @@ private:
         CHECKING
     }; 
 
-    nav_msgs::msg::Odometry dronePose_; //!< next goal of the drone  //!(could be replaced with odo) !//
+    nav_msgs::msg::Odometry dronePose_; //!< current position of the drone
 
     // feedback publishers
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_; //!< publisher for state
@@ -286,8 +286,8 @@ private:
     {
         std::mutex soilMutex;
 
-        geometry_msgs::msg::Point soilPose; // position of the last soil sample
-        custom_msgs::SoilData soilData; // soil data message
+        nav_msgs::msg::Odometry soilPose; // position of the last soil sample
+        unomas::msg::SoilInfo soilData; // soil data message
 
     } soil_; // soil data
 
@@ -332,7 +332,7 @@ private:
         bool rowAlligned = false;
 
         // sampling
-        const float minSampleDistance = 0.7;  //!< minimum distance between samples (also used to determine if allignment point is in already sampled row)
+        const float minSampleDistance = 0.7;
 
         // aligning
         State aligningState;

@@ -55,7 +55,6 @@ PathPlanner::PathPlanner() : Node("path_planner")
     obstaclesSub_ = this->create_subscription<custom_msgs::Obstacles>("/obstacles", 10, std::bind(&PathPlanner::subscribeObstacles, this, std::placeholders::_1));
     groundLiDARSub_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/laserscan2", 10, std::bind(&PathPlanner::subscribeGroundLiDAR, this, std::placeholders::_1));
 
-
     // initialise wall timer for feedback pubs
     timer_ = this->create_wall_timer(std::chrono::milliseconds(500), std::bind(&PathPlanner::timer_callback, this));
 }
