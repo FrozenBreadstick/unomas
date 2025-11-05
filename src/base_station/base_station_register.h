@@ -14,7 +14,7 @@ namespace BaseStation
         public:
             BaseStationRegister(std::string station_name);
             ~BaseStationRegister();
-        
+            
         private:
             std::shared_ptr<BaseStation::BaseStationPath> path_planner_;
             std::string station_name_;
