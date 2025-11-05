@@ -9,8 +9,6 @@ Robot::RobotUplink::RobotUplink(std::string serial_id) :
     battery_(69),
     state_("MENTAL_CRISIS")
 {
-    //controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
-
     geometry_msgs::msg::Point dummy;
     dummy.x = 69.0;
     dummy.y = 96.0;
@@ -34,16 +32,21 @@ Robot::RobotUplink::RobotUplink(std::string serial_id) :
         "Registrar", 10);
 
 
-    emergency_publisher_ = this->create_publisher<std_msgs::msg::Bool>("dumpTopic", 10);
-    battery_publisher_ = this->create_publisher<std_msgs::msg::Int32>("dumpTopic", 10);
-    position_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic", 10);
-    state_publisher_ = this->create_publisher<std_msgs::msg::String>("dumpTopic", 10);
-    target_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic", 10);
+    // emergency_publisher_ = this->create_publisher<std_msgs::msg::Bool>("dumpTopic00", 10);
+    // battery_publisher_ = this->create_publisher<std_msgs::msg::Int32>("dumpTopic01", 10);
+    // position_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic02", 10);
+    // state_publisher_ = this->create_publisher<std_msgs::msg::String>("dumpTopic03", 10);
+    // target_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic04", 10);
 }
 
 Robot::RobotUplink::~RobotUplink()
 {
     RCLCPP_INFO(this->get_logger(), "RobotUplink node for robot '%s' is shutting down.", serial_id_.c_str());
+}
+
+void Robot::RobotUplink::initialise()
+{
+    //controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
 }
 
 void Robot::RobotUplink::goalCallback(const unomas::msg::AddressedPoseArray::SharedPtr msg)

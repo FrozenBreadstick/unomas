@@ -18,7 +18,7 @@ def generate_launch_description():
             package='unomas',
             executable='simulation_extras',
             output='screen',
-            parameters=[{'size': 150, 'resolution': 1}]
+            parameters=[{'size': 150}]
         ),
         Node(
             package='unomas',

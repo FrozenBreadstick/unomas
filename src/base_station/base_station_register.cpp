@@ -21,13 +21,16 @@ BaseStation::BaseStationRegister::BaseStationRegister(std::string station_name) 
     register_requester_publisher_ = this->create_publisher<unomas::msg::StrStr>(
         "Register", 10
     );
-
-    path_planner_ = std::make_shared<BaseStation::BaseStationPath>(station_name_, shared_from_this());
 }
 
 BaseStation::BaseStationRegister::~BaseStationRegister()
 {
     RCLCPP_INFO(this->get_logger(), "BaseStation Registration node is shutting down.");
+}
+
+void BaseStation::BaseStationRegister::initialise()
+{
+    path_planner_ = std::make_shared<BaseStation::BaseStationPath>(station_name_, shared_from_this());
 }
 
 void BaseStation::BaseStationRegister::serialScanCallback(const std_msgs::msg::String::SharedPtr msg)

@@ -18,6 +18,8 @@ int main(int argc, char* argv[])
     auto terrain_soil_manager = std::make_shared<BaseStation::BaseStationTerrainSoil>(station_name);
     auto registrar_manager = std::make_shared<BaseStation::BaseStationRegister>(station_name);
 
+    registrar_manager->initialise();
+
     rclcpp::executors::MultiThreadedExecutor executor;
 
     executor.add_node(status_manager);
