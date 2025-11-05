@@ -8,6 +8,8 @@
 #include "unomas/srv/query_soil.hpp"
 #include "unomas/msg/soil_info.hpp"
 
+#include "unomas/srv/dummy_trigger.hpp"
+
 #include <random>
 #include <cmath>
 

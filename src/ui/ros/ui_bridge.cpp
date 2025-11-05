@@ -26,6 +26,11 @@ UI::UIBridge::UIBridge() : Node("ui_bridge_node")
         "macro_plan_update",
         std::bind(&UI::UIBridge::macroPlanServiceCallback, this, std::placeholders::_1, std::placeholders::_2)
     );
+
+    debug_pose_service_ = this->create_service<unomas::srv::DummyTrigger>(
+        "testPoseArray",
+        std::bind(&UI::UIBridge::debugPoseServiceCallback, this, std::placeholders::_1, std::placeholders::_2)
+    );
 }
 
 UI::UIBridge::~UIBridge()
@@ -139,4 +144,34 @@ void UI::UIBridge::macroPlanServiceCallback(
                                                    [](const auto &f){return f.enabled;});
     RCLCPP_INFO(this->get_logger(), "Macro plan forwarded for station '%s' targeting '%s' with %zu routes and %zu gates.",
                 plan.station_name.c_str(), plan.robot_address.c_str(), plan.routes.size(), active_gates);
+}
+
+
+void UI::UIBridge::debugPoseServiceCallback(const std::shared_ptr<unomas::srv::DummyTrigger::Request> request,
+            std::shared_ptr<unomas::srv::DummyTrigger::Response> response)
+{
+    std::string topic = request->message + "/goals";
+    debug_pose_publisher_ = this->create_publisher<unomas::msg::AddressedPoseArray>(topic, 10);
+
+    unomas::msg::AddressedPoseArray array;
+
+    for (int i = 0; i < 3; ++i)
+    {
+      geometry_msgs::msg::Pose pose;
+      pose.position.x = static_cast<float>(std::rand() % 10);
+      pose.position.y = static_cast<float>(std::rand() % 10);
+      pose.position.z = 0.0;
+      pose.orientation.w = 1.0;
+      pose.orientation.x = 0.0;
+      pose.orientation.y = 0.0;
+      pose.orientation.z = 0.0;
+      array.poses.push_back(pose);
+    }
+
+    array.address = request->message2;
+
+    debug_pose_publisher_->publish(array);
+    
+    response->message3 = "";
+    response->message4 = "";
 }

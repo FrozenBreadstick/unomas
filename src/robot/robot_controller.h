@@ -121,7 +121,7 @@ namespace Robot {
              * 
              *  @return void
              */
-            void publishNavGoals();
+            void publishNavGoals(geometry_msgs::msg::Pose goal);
 
 
             /*! @brief publisher callback that publishes calculated velocities needed for the robot to move to cmd_vel
@@ -133,15 +133,6 @@ namespace Robot {
             void publishCmdVel(geometry_msgs::msg::Twist vel);
 
         //-------------------  FUNCTIONAL SUBSCRIBERS  -------------------//
-
-            /*! @brief subscriber callback that listens for goal pose instruction from base station
-             *
-             *  @param[in]    goals - goals to be reached
-             * 
-             *  @return void
-             */
-            void subscribeGoals(geometry_msgs::msg::PoseArray goals);
-
 
             /*! @brief subscriber callback that listens for obstacles from detection node
              *
@@ -240,6 +231,24 @@ namespace Robot {
             std::vector<geometry_msgs::msg::Point> determineRows(std::vector<geometry_msgs::msg::Point> lidar);
 
 
+            /*! @brief determine number of crop rows adjacent to the drone (only for use in surveying)
+             *
+             *  @param[in] lidar - vector of points
+             * 
+             *  @return std::vector<geometry_msgs::msg::Point> - vector of points
+             */
+            std::vector<geometry_msgs::msg::Point> locateInitialRows(std::vector<geometry_msgs::msg::Point> lidar);
+
+            
+            /*! @brief check if any known obstacles are within range of the drone
+             *
+             *  @param[in] point - point of obstacle
+             * 
+             *  @return bool - true if obstacle is in range
+             */
+            bool isObstacleInRange(geometry_msgs::msg::Point point);
+
+
             /*! @brief calls sample service, publishes soil data and updates last soil point
              *
              *  @return void
@@ -266,7 +275,7 @@ namespace Robot {
              *
              *  @return point of current goal 
              */
-            geometry_msgs::msg::Point getGoal();
+            geometry_msgs::msg::Pose getGoal();
 
 
             /*! @brief getter for current robot state
@@ -296,7 +305,7 @@ namespace Robot {
              * 
              *  @return void
              */
-            void setGoals(std::vector<geometry_msgs::msg::Point> goals);
+            void setGoals(geometry_msgs::msg::PoseArray goals);
 
         // ------------- VARIABLES ---------------- //
 
@@ -314,6 +323,9 @@ namespace Robot {
 
             const float minSampleDistance_ = 0.7;
 
+            const float loop_rate_hz = 10.0;   // run loop 10 times per second
+
+            std::chrono::duration<double> loop_period_;
 
             enum class State
             {
@@ -344,7 +356,7 @@ namespace Robot {
             // feedback publishers
             rclcpp::Publisher<std_msgs::msg::String>::SharedPtr statePub_; //!< publisher for state
             rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr emergencyPub_; //!< publisher for emergency
-            rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goalPub_; //!< publisher for current goal poses
+            rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr goalPub_; //!< publisher for current goal poses
             rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr batteryPub_; //!< publisher for battery level
             rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr odomPub_; //!< publisher for odometry
             rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr connectionPub_; //!< publisher for connection status
@@ -429,7 +441,7 @@ namespace Robot {
                 std::mutex goalsMutex;
 
                 geometry_msgs::msg::PoseArray rawGoals; //!< vector of goal poses raw from base station
-                std::vector<geometry_msgs::msg::Pose> droneGoals; //!< vector of goal poses that can be modified by the drone
+                geometry_msgs::msg::PoseArray droneGoals; //!< vector of goal poses that can be modified by the drone
 
                 geometry_msgs::msg::Pose currentGoal; //!< current goal of the drone
                 bool commuting = false;
