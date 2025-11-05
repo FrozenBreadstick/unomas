@@ -89,6 +89,8 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     // initialise service clients
     soil_query_client_ = node_->create_client<unomas::srv::QuerySoil>("query_soil");
 
+    soil_info_publisher_ = node_->create_publisher<unomas::msg::SoilInfo>("unomas/soil", 10);
+
 }
 
 Robot::RobotController::~RobotController()

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UNO MAS · Robot Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+      --bg:#0b0d12; --panel:#121622; --muted:#9aa3b2; --text:#e8edf4;
+      --accent:#4aa3ff; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --card:#151a28;
+      --border:#202636;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:radial-gradient(1200px 800px at 20% -10%, #0f1422 0, #0b0d12 60%),
+      linear-gradient(180deg,#0b0d12,#0b0d12);
+      color:var(--text); font:16px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      display:flex; flex-direction:column;
+    }
+    header{padding:20px 24px; border-bottom:1px solid var(--border); background:#0c111b88; backdrop-filter: blur(6px);}
+    header h1{margin:0; font-size:18px; font-weight:600; letter-spacing:.2px}
+    header h1 span{opacity:.8; font-weight:400}
+    main{max-width:980px; width:100%; margin:28px auto; padding:0 16px; flex:1}
+    .grid{display:grid; gap:16px; grid-template-columns:1.2fr .8fr}
+    @media (max-width:860px){.grid{grid-template-columns:1fr}}
+    .card{
+      background:linear-gradient(180deg, #151b2a, #121826);
+      border:1px solid var(--border); border-radius:14px; padding:18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .header-row{display:flex; align-items:center; gap:12px; margin-bottom:12px}
+    .name{font-size:22px; font-weight:700; letter-spacing:.3px}
+    .muted{color:var(--muted)}
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px; font-size:13px; border:1px solid var(--border);
+      background:#0e1422;
+    }
+    #status-panel { flex: 0.2; min-height: 150px; }
+    .dot{width:8px;height:8px;border-radius:50%}
+    .dot.idle{background:var(--muted)}
+    .dot.active{background:var(--ok)}
+    .dot.warn{background:var(--warn)}
+    .dot.err{background:var(--err)}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:13px; background:#101728}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    .section-title{font-size:14px; color:var(--muted); margin:14px 0 8px}
+    .kpi{
+      display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
+    }
+    @media (max-width:520px){.kpi{grid-template-columns:1fr 1fr}}
+    .kpi .tile{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px}
+    .kpi .label{color:var(--muted); font-size:12px; letter-spacing:.2px}
+    .kpi .value{font-size:18px; margin-top:4px; font-weight:600}
+    .stack{display:grid; gap:12px}
+    .progress-wrap{display:flex; align-items:center; gap:12px}
+    .progress{flex:1; height:10px; background:#0e1420; border:1px solid var(--border); border-radius:999px; overflow:hidden}
+    .progress > span{display:block; height:100%; background:linear-gradient(90deg,#4aa3ff,#22c55e)}
+    .kv{display:grid; grid-template-columns:130px 1fr; gap:6px 14px; align-items:center}
+    .code{background:#0e1420; border:1px dashed #22304a; color:#cfe1ff; padding:10px 12px; border-radius:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; overflow:auto}
+    footer{padding:18px 24px; border-top:1px solid var(--border); color:var(--muted)}
+    .right{margin-left:auto}
+  /* Right map */
+  #map-area{flex:1; min-width: 700px;}
+  canvas{max-width:100%;height:auto;border-left:1px solid var(--border);background:#0e1420;}
+</style>
+</head>
+<body>
+<header>
+  <h1>UNO MAS · Robot Dashboard</h1>
+</header>
+
+<main>
+    
+  <div class="grid">
+      <!-- Left: Primary status -->
+      <section class="card">
+        <div class="header-row">
+          <div class="name" id="name">—</div>
+          <span class="badge" id="state-badge"><span class="dot idle"></span><strong id="state">—</strong></span>
+          <span class="pill" id="emergency-pill"><span class="muted">Emergency</span>: <span id="emergency">—</span></span>
+          <span class="pill right muted" id="updated-pill"><span class="muted">Updated</span>: <span id="updated">—</span></span>
+        </div>
+
+        <div class="section-title">Battery</div>
+        <div class="progress-wrap">
+          <div class="progress" aria-label="Battery">
+            <span id="battery-bar" style="width:0%"></span>
+          </div>
+          <strong id="battery-text">0%</strong>
+        </div>
+
+        <div class="section-title">Positions</div>
+        <div class="kpi">
+          <div class="tile">
+            <div class="label">Current X</div>
+            <div class="value" id="cur-x">—</div>
+          </div>
+          <div class="tile">
+            <div class="label">Current Y</div>
+            <div class="value" id="cur-y">—</div>
+          </div>
+          <div class="tile">
+            <div class="label">Current Z</div>
+            <div class="value" id="cur-z">—</div>
+          </div>
+          <div class="tile">
+            <div class="label">Target X</div>
+            <div class="value" id="tgt-x">—</div>
+          </div>
+          <div class="tile">
+            <div class="label">Target Y</div>
+            <div class="value" id="tgt-y">—</div>
+          </div>
+          <div class="tile">
+            <div class="label">Target Z</div>
+            <div class="value" id="tgt-z">—</div>
+          </div>
+        </div>
+      </section>
+
+  <!-- MAP PANEL -->
+  <section id="map-area">
+    <canvas id="cv" width="800" height="800"></canvas>
+  </section>
+</main>
+
+<script>
+const WORLD_SIZE=135, HALF=WORLD_SIZE/2;
+const IMG_URL="/static/EnvTopView.png";
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const img=new Image(); img.src=IMG_URL; img.onload=draw;
+let last={name:"—",state:"IDLE",battery:0,emergency:false,pos:{x:0,y:0},tgt:{x:0,y:0}};
+
+// helpers
+function worldToScreen(x,y){const s=cv.width/WORLD_SIZE;return{x:cv.width/2+x*s,y:cv.height/2-y*s};}
+function drawGrid(){
+  const s=cv.width/WORLD_SIZE; ctx.lineWidth=1;
+  for(let u=Math.ceil(-HALF);u<=Math.floor(HALF);u++){
+    const vx=worldToScreen(u,0).x, hy=worldToScreen(0,u).y;
+    ctx.strokeStyle=(u===0)?"#ef4444":(u%10===0?"#4aa3ff":u%5===0?"#52a2ff55":"#ffffff10");
+    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,cv.height);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(cv.width,hy);ctx.stroke();
+  }
+}
+function drawBackground(){
+  const iw=img.width,ih=img.height,cw=cv.width,ch=cv.height;
+  const r=Math.max(cw/iw,ch/ih);const dw=iw*r,dh=ih*r;const dx=(cw-dw)/2,dy=(ch-dh)/2;
+  ctx.drawImage(img,dx,dy,dw,dh);
+}
+function drawDot(x,y,color,r){
+  const p=worldToScreen(x,y);
+  ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000055";ctx.stroke();
+}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(img.complete)drawBackground();
+  drawGrid();
+  drawDot(last.tgt.x,last.tgt.y,"#ffd34d",5);
+  drawDot(last.pos.x,last.pos.y,"#4aa3ff",6);
+}
+async function load(){
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"}), j=await r.json();
+    last.name=j.name; last.state=j.current_state; last.battery=+j.battery;
+    last.emergency=!!j.emergency;
+    last.pos=j.current_position; last.tgt=j.target_position;
+    updateUI();
+    draw();
+  }catch(e){console.error(e);}
+}
+function updateUI(){
+  document.getElementById("name").textContent=last.name;
+  document.getElementById("state").textContent=last.state;
+  const dot=document.querySelector(".dot");
+  dot.className="dot idle";
+  if(/ERROR|FAULT/i.test(last.state))dot.className="dot err";
+  else if(/IDLE/i.test(last.state))dot.className="dot idle";
+  else dot.className="dot active";
+  document.getElementById("battery-bar").style.width=Math.min(Math.max(last.battery,0),100)+"%";
+  document.getElementById("battery-text").textContent=last.battery+"%";
+  document.getElementById("emergency").textContent=last.emergency?"YES":"No";
+  document.getElementById("cur-x").textContent=last.pos.x.toFixed(2);
+  document.getElementById("cur-y").textContent=last.pos.y.toFixed(2);
+  document.getElementById("cur-z").textContent=last.pos.z.toFixed(2);
+  document.getElementById("tgt-x").textContent=last.tgt.x.toFixed(2);
+  document.getElementById("tgt-y").textContent=last.tgt.y.toFixed(2);
+  document.getElementById("tgt-z").textContent=last.tgt.z.toFixed(2);
+  document.getElementById("updated").textContent=new Date().toLocaleTimeString();
+}
+function resize(){const w=cv.clientWidth;cv.width=w;cv.height=w;draw();}
+window.addEventListener("resize",resize);
+resize(); load(); setInterval(load,1000);
+</script>
+</body>
+</html>
