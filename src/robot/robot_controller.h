@@ -284,7 +284,7 @@ namespace Robot {
              *
              *  @return point of current goal 
              */
-            geometry_msgs::msg::Pose getGoal();
+            geometry_msgs::msg::Point getGoal();
 
 
             /*! @brief getter for current robot state
@@ -306,6 +306,13 @@ namespace Robot {
              *  @return int - battery level
              */
             int getBattery();
+
+
+            /*! @brief getter for current position of robot
+             *
+             *  @return geometry_msgs::msg::Point - current position of the robot
+             */
+            geometry_msgs::msg::Point getPosition();
 
 
             /*! @brief setter for goals from base station, will also create navThread 

@@ -90,7 +90,7 @@ void Robot::RobotUplink::UplinkTimerCallback()
         battery_ = controller_->getBattery();
         position_ = controller_->getPosition();
         state_ = controller_->getStatus();
-        target_ = controller_->getTarget();
+        target_ = controller_->getGoal();
 
         emergency_publisher_->publish(std_msgs::msg::Bool().set__data(emergency_));
         battery_publisher_->publish(std_msgs::msg::Int32().set__data(battery_));

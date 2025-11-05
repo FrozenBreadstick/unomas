@@ -1359,7 +1359,7 @@ double Robot::RobotController::correctAngle(double angle)
 
 
 // Quat to Yaw
-double quaternionToYaw(geometry_msgs::msg::Quaternion q)
+double Robot::RobotController::quaternionToYaw(geometry_msgs::msg::Quaternion q)
 {
     double x = q.x;
     double y = q.y;

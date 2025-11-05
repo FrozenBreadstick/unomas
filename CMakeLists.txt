@@ -90,7 +90,7 @@ ament_target_dependencies(simulation_extras
 
 add_executable(robot
  src/robot/robot_main.cpp
-#  src/robot/robot_controller.cpp
+ src/robot/robot_controller.cpp
  src/robot/robot_controller.cpp
  src/robot/robot_uplink.cpp
 )
