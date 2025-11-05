@@ -4,13 +4,13 @@ BaseStation::BaseStationStatusManager::BaseStationStatusManager(std::string stat
 Node(station_name + "_status_manager"), 
 name_(station_name),
 emergency_(false),
-battery_(100),
+battery_(30),
 current_state_("IDLE")
 {
     geometry_msgs::msg::Point init_point;
-    init_point.x = 0.0;
-    init_point.y = 0.0;
-    init_point.z = 0.0;
+    init_point.x = 20.0;
+    init_point.y = 30.0;
+    init_point.z = 50.0;
     current_position_ = init_point;
     target_position_ = init_point;
 
