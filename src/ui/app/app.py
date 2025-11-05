@@ -1,10 +1,12 @@
-import os
 import atexit
-from flask import Flask, jsonify, Response, send_file
+from collections.abc import Iterable
+from flask import Flask, jsonify, send_file, request
 
 import rclpy
 from rclpy.node import Node
-from unomas.srv import StatusUpdateService, TerrainSoilData
+from unomas.srv import StatusUpdateService, TerrainSoilData, UpdateMacroPlan
+from unomas.msg import MacroPlan as MacroPlanMsg, FieldPlan, RoutePlan
+from geometry_msgs.msg import Point
 
 app = Flask(__name__)
 app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False
@@ -40,6 +42,22 @@ class SoilClient(Node):
             raise RuntimeError("Soil service returned no result.")
         return fut.result().data
 
+class MacroPlanClient(Node):
+    def __init__(self, service_name: str = "macro_plan_update"):
+        super().__init__("ui_macro_plan_client")
+        self._client = self.create_client(UpdateMacroPlan, service_name)
+
+    def submit(self, plan_msg: MacroPlanMsg, timeout_sec: float = 3.0):
+        if not self._client.wait_for_service(timeout_sec=timeout_sec):
+            raise RuntimeError("Macro plan service 'macro_plan_update' is not available.")
+        req = UpdateMacroPlan.Request()
+        req.plan = plan_msg
+        fut = self._client.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=timeout_sec)
+        if fut.result() is None:
+            raise RuntimeError("Macro plan service returned no result.")
+        return fut.result()
+
 def packet_to_dict(p):
     return {
         "name": p.name,
@@ -65,18 +83,81 @@ def soil_to_dict(soil_msg):
         })
     return out
 
+def _point_from_dict(data: dict | None) -> Point:
+    pt = data or {}
+    point = Point()
+    point.x = float(pt.get("x", 0.0))
+    point.y = float(pt.get("y", 0.0))
+    point.z = float(pt.get("z", 0.0))
+    return point
+
+def dict_to_macro_plan(payload: dict, fallback_start: Point | None) -> MacroPlanMsg:
+    plan = MacroPlanMsg()
+    plan.station_name = str(payload.get("station_name", "")).strip()
+    plan.robot_address = str(payload.get("robot_address", "")).strip()
+    plan.visit_all_fields = bool(payload.get("visit_all_fields", True))
+
+    start_payload = payload.get("start")
+    if isinstance(start_payload, dict):
+        plan.start = _point_from_dict(start_payload)
+    elif fallback_start is not None:
+        plan.start = fallback_start
+    else:
+        plan.start = Point()
+
+    plan.fields.clear()
+    for idx, field in enumerate(payload.get("fields", []), start=1):
+        gate = field.get("gate")
+        if not isinstance(gate, dict):
+            continue
+        fp = FieldPlan()
+        fp.label = str(field.get("label", f"Field {idx}")).strip() or f"Field {idx}"
+        fp.enabled = bool(field.get("enabled", True))
+        fp.gate = _point_from_dict(gate)
+        outline = field.get("outline", [])
+        if isinstance(outline, Iterable):
+            fp.outline = [_point_from_dict(pt) for pt in outline if isinstance(pt, dict)]
+        plan.fields.append(fp)
+
+    plan.routes.clear()
+    for idx, route in enumerate(payload.get("routes", []), start=1):
+        waypoints = route.get("waypoints", [])
+        if not isinstance(waypoints, Iterable):
+            continue
+        rp = RoutePlan()
+        rp.label = str(route.get("label", f"Route {idx}")).strip() or f"Route {idx}"
+        rp.width = float(route.get("width", 0.0) or 0.0)
+        rp.waypoints = [_point_from_dict(pt) for pt in waypoints if isinstance(pt, dict)]
+        if len(rp.waypoints) >= 2:
+            plan.routes.append(rp)
+
+    if not plan.station_name:
+        raise ValueError("station_name is required.")
+    if not plan.robot_address:
+        raise ValueError("robot_address is required.")
+    if not plan.routes:
+        raise ValueError("at least one route must be provided.")
+    if not any(field.enabled for field in plan.fields):
+        raise ValueError("at least one gate must be enabled.")
+
+    return plan
+
 # --- Initialize ROS exactly once, then create nodes ---
 _status_client = None
 _soil_client = None
+_plan_client = None
+_last_robot_point: Point | None = None
 
 def _init_ros_once():
-    global _status_client, _soil_client
+    global _status_client, _soil_client, _plan_client
     if not rclpy.ok():
         rclpy.init(args=None)
     if _status_client is None:
         _status_client = StatusClient()
     if _soil_client is None:
         _soil_client = SoilClient()
+    if _plan_client is None:
+        _plan_client = MacroPlanClient()
 
 _init_ros_once()
 
@@ -92,6 +173,11 @@ def _shutdown_ros():
             _soil_client.destroy_node()
     except Exception:
         pass
+    try:
+        if _plan_client is not None:
+            _plan_client.destroy_node()
+    except Exception:
+        pass
     if rclpy.ok():
         rclpy.shutdown()
 
@@ -99,6 +185,11 @@ def _shutdown_ros():
 def api_status():
     try:
         packet = _status_client.fetch_packet(timeout_sec=2.0)
+        global _last_robot_point
+        _last_robot_point = Point()
+        _last_robot_point.x = float(packet.current_position.x)
+        _last_robot_point.y = float(packet.current_position.y)
+        _last_robot_point.z = float(packet.current_position.z)
         return jsonify(packet_to_dict(packet))
     except Exception as e:
         return jsonify({"error": str(e)}), 503
@@ -114,6 +205,28 @@ def api_soil():
 @app.get("/")
 def home():
     return send_file("templates/heatmap.html")
+
+@app.post("/api/macro-plan")
+def api_macro_plan():
+    try:
+        payload = request.get_json(force=True, silent=False)
+    except Exception as exc:
+        return jsonify({"accepted": False, "message": f"Invalid JSON: {exc}"}), 400
+
+    if not isinstance(payload, dict):
+        return jsonify({"accepted": False, "message": "Request body must be a JSON object."}), 400
+
+    try:
+        plan_msg = dict_to_macro_plan(payload, _last_robot_point)
+    except Exception as exc:
+        return jsonify({"accepted": False, "message": f"Failed to parse plan: {exc}"}), 400
+
+    try:
+        result = _plan_client.submit(plan_msg)
+        status_code = 200 if result.accepted else 409
+        return jsonify({"accepted": bool(result.accepted), "message": result.message}), status_code
+    except Exception as exc:
+        return jsonify({"accepted": False, "message": str(exc)}), 503
 
 # from flask import send_file
 # @app.get("/status")

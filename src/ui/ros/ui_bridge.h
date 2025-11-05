@@ -7,6 +7,12 @@
 #include "unomas/msg/status_update_packet.hpp"
 #include "unomas/srv/terrain_soil_data.hpp"
 #include "unomas/msg/soil_info.hpp"
+#include "unomas/srv/update_macro_plan.hpp"
+#include "unomas/msg/macro_plan.hpp"
+
+#include <unordered_map>
+#include <mutex>
+#include <vector>
 
 namespace UI
 {
@@ -36,6 +42,15 @@ namespace UI
             rclcpp::Subscription<unomas::msg::SoilInfo>::SharedPtr soil_info_subscriber_;
             std::vector<unomas::msg::SoilInfo> soil_data_;
             std::mutex soil_data_lock_;
+
+            void macroPlanServiceCallback(
+                const std::shared_ptr<unomas::srv::UpdateMacroPlan::Request> request,
+                std::shared_ptr<unomas::srv::UpdateMacroPlan::Response> response);
+            rclcpp::Service<unomas::srv::UpdateMacroPlan>::SharedPtr macro_plan_service_;
+            std::unordered_map<std::string, rclcpp::Publisher<unomas::msg::MacroPlan>::SharedPtr> macro_plan_publishers_;
+            std::mutex macro_plan_lock_;
+
+            rclcpp::Publisher<unomas::msg::MacroPlan>::SharedPtr ensurePlanPublisher(const std::string& topic);
     };
 }
 

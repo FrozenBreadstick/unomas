@@ -29,12 +29,16 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StatusUpdatePacket.msg"
   "msg/SoilInfo.msg"
   "msg/AddressedPoseArray.msg"
+  "msg/FieldPlan.msg"
+  "msg/RoutePlan.msg"
+  "msg/MacroPlan.msg"
 
   "srv/DebugTrigger.srv"
   "srv/DebugResponse.srv"
   "srv/StatusUpdateService.srv"
   "srv/QuerySoil.srv"
   "srv/TerrainSoilData.srv"
+  "srv/UpdateMacroPlan.srv"
   DEPENDENCIES geometry_msgs
 )
 rosidl_get_typesupport_target(custom_messages ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -82,7 +86,7 @@ ament_target_dependencies(simulation_extras
 
 add_executable(robot
  src/robot/robot_main.cpp
- #src/robot/robot_controller.cpp
+#  src/robot/robot_controller.cpp
  src/robot/robot_uplink.cpp
 )
 target_link_libraries(robot
