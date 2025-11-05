@@ -117,7 +117,7 @@
   <gazebo reference="base_scan">
     <material>Gazebo/FlatBlack</material>
     <sensor type="gpu_lidar" name="lidar">
-      <pose relative_to='base_scan'>0 0 0 0 0 0</pose>
+      <pose relative_to='base_scan'>0 0 0.2 0 0 0</pose>
       <visualize>$(arg laser_visual)</visualize>
       <topic>fella/scan</topic>
       <update_rate>3</update_rate>
