@@ -25,7 +25,7 @@
             </geometry>
         </collision>
         <inertial>
-            <origin xyz="0 0 0.03282" rpy="0 0 0"/>
+            <origin xyz="-0.1 0 0.03282" rpy="0 0 0"/>
             <mass value="20.0"/>
             <inertia
                 ixx="1.284"
@@ -40,6 +40,8 @@
     <!-- Wheels -->
     <xacro:wheel wheel_id="left" y_pos="0.42" x_pos="0.0"/>
     <xacro:wheel wheel_id="right" y_pos="-0.42" x_pos="0.0"/>
+    <!-- back wheels -->
+    <xacro:wheel wheel_id="back" y_pos="0.0" x_pos="-0.28"/>
 
     <joint name="imu_joint" type="fixed">
         <parent link="base_link"/>
