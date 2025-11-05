@@ -46,7 +46,7 @@ Robot::RobotUplink::~RobotUplink()
 
 void Robot::RobotUplink::initialise()
 {
-    //controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
+    controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
 }
 
 void Robot::RobotUplink::goalCallback(const unomas::msg::AddressedPoseArray::SharedPtr msg)
