@@ -295,13 +295,15 @@ namespace Robot {
             const std::shared_ptr<rclcpp::Node>& node_;
             // std::vector<geometry_msgs::msg::Point> goals_;
             // nav_msgs::msg::Odometry current_odometry_;
-            // nav_msgs::msg::Odometry last_query_odom_;
+            nav_msgs::msg::Odometry last_query_odom_;
             // bool emergency_;
             // int battery_;
             // std::string current_status_;
             std::string registered_station_;
 
             // geometry_msgs::msg::Point goal_position_;
+
+            const float minSampleDistance_ = 0.7;
 
 
             enum class State
@@ -379,9 +381,6 @@ namespace Robot {
 
                 geometry_msgs::msg::Point noGoal; // Default pose if no goal is provided
 
-                bool emergencyReturn; // true if robot is in emergency return
-                geometry_msgs::msg::Point emergencyPosition; // position of emergency return
-
             } feedbackData_; //!< feedback data structure containing the progress of the motion, the status of the motion and the current pose
 
 
@@ -433,8 +432,9 @@ namespace Robot {
             
             struct threadData
             {
+                std::mutex threadMutex; 
+
                 std::thread* navThread; //!< thread for the navigation
-                std::atomic_bool navDone; //!< atomic boolean for the navigation thread
                 std::atomic_bool threadExists; //!< atomic boolean for the navigation thread
 
             } threadData_; //!< thread data
@@ -457,7 +457,7 @@ namespace Robot {
                 bool rowAlligned = false;
 
                 // sampling
-                const float minSampleDistance = 0.7; 
+                
 
                 // aligning
                 State aligningState;
@@ -466,17 +466,24 @@ namespace Robot {
                 // waiting
 
                 // emergency
+                bool emergencyReturn; // true if robot is in emergency return
+                geometry_msgs::msg::Point emergencyPosition; // position of emergency return
 
                 // universal
+                std::mutex stateMutex;
+
                 State superState;
                 bool changedState;
+                std::atomic_bool navDone; //!< atomic boolean for the navigation thread
                 
             } stateData_;
 
 
             struct cropData
             {
-                std::vector<geometry_msgs::msg::Point> cropCentres;
+                std::mutex cropMutex;
+
+                std::vector<geometry_msgs::msg::Point> cropCentres;     
 
                 geometry_msgs::msg::Point currentCrop;
                 geometry_msgs::msg::Point nextCrop;

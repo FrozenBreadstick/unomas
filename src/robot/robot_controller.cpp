@@ -4,12 +4,10 @@
 
     Things that need doing
 
-    - integrate progress into this class (done i think)
-    - fix subs and pubs in general (and add more) (done)
     - write cmake function
-    - add emergency return to home
-    - add mutex safety
-    - modify start of loop 
+    - add mutex safety  (ask mattia about this)
+
+    - General error checking and building and testing
 
 */
 
@@ -100,9 +98,13 @@ Robot::RobotController::~RobotController()
     RCLCPP_INFO(node_->get_logger(), "RobotController for robot '%s' is shutting down.", serial_id_.c_str());
 
     // close nav thread
+    std::lock_guard<std::mutex> lock(threadData_.threadMutex);
+
     if(threadData_.threadExists == true) {
         if(threadData_.navThread->joinable() == true) {
-            threadData_.navDone = true;
+            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+            stateData_.navDone = true;
             threadData_.navThread->join();
             delete threadData_.navThread;
         }
@@ -118,12 +120,7 @@ void Robot::RobotController::publishState()
     // make message
     std_msgs::msg::String msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-        msg.data = feedbackData_.state;
-    }
+    msg.data = feedbackData_.state;
 
     // log message
     RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.data.c_str());
@@ -141,12 +138,7 @@ void Robot::RobotController::publishEmergency()
     // make message
     std_msgs::msg::Bool msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-        msg.data = feedbackData_.emergency;
-    }
+    msg.data = feedbackData_.emergency;
 
     // log message
     RCLCPP_INFO(this->get_logger(), "Publishing %s", msg.data ? "true" : "false");
@@ -162,12 +154,7 @@ void Robot::RobotController::publishGoal()
     // make message
     geometry_msgs::msg::Point msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-        msg = feedbackData_.goal;
-    }
+    msg = feedbackData_.goal;
 
     // log message
     RCLCPP_INFO(this->get_logger(), "Publishing goal: (%.2f, %.2f)", msg.pose.position.x, msg.pose.position.y);
@@ -183,12 +170,7 @@ void Robot::RobotController::publishBattery()
     // make message
     std_msgs::msg::Float32 msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-        msg.data = feedbackData_.battery;
-    }
+    msg.data = feedbackData_.battery;
 
     // log message
     RCLCPP_INFO(this->get_logger(), "Publishing battery level: %.2f", msg.data);
@@ -204,15 +186,12 @@ void Robot::RobotController::publishOdometry()
     // make message
     nav_msgs::msg::Odometry msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+    feedbackData_.currentPosition = getOdometry().pose.position;
 
-        msg = feedbackData_.currentPosition;
-    }
+    msg = feedbackData_.currentPosition;
 
     // log message
-    RCLCPP_INFO(this->get_logger(), "Publishing odometry: (%.2f, %.2f, %.2f)", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z);
+    RCLCPP_INFO(this->get_logger(), "Publishing odometry: (%.2f, %.2f, %.2f)", msg.x, msg.y, msg.z);
 
     // publish message
     odomPub_->publish(msg);
@@ -225,12 +204,7 @@ void Robot::RobotController::publishConnection()
     // make message
     std_msgs::msg::Bool msg;
 
-    // lock feedback mutex
-    {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-        msg.data = feedbackData_.connection;
-    }
+    msg.data = feedbackData_.connection;
 
     // log message
     RCLCPP_INFO(this->get_logger(), "Publishing connection status: %s", msg.data ? "true" : "false");
@@ -243,6 +217,9 @@ void Robot::RobotController::publishConnection()
 // timer callback that calls feedback publishers
 void Robot::RobotController::timer_callback()
 {
+    // lock feedback mutex
+    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
     // publish state
     publishState();
 
@@ -271,17 +248,9 @@ void Robot::RobotController::soilRequestCallback(rclcpp::Client<unomas::srv::Que
 {
     auto response = future.get();
 
-    nav_msgs::msg::Odometry last_query_odom;
-
-    {
-        std::lock_guard<std::mutex> lock(soil_.soilMutex);
-
-        last_query_odom = soil_.soilPose;
-    }
-
     unomas::msg::SoilInfo soil_info_msg;
-    soil_info_msg.x = last_query_odom.position.x;
-    soil_info_msg.y = last_query_odom.position.y;
+    soil_info_msg.x = last_query_odom_.position.x;
+    soil_info_msg.y = last_query_odom_.position.y;
     soil_info_msg.moisture = response->moisture;
     soil_info_msg.nutrients = response->nutrients;
     soil_info_msg.ph = response->ph;
@@ -316,41 +285,6 @@ void Robot::RobotController::publishNavGoals(geometry_msgs::msg::PoseStamped goa
 
 
 //-------------------  FUNCTIONAL SUBSCRIBERS  -------------------//
-
-
-// subscriber callback that listens for goal pose instruction from base station
-void Robot::RobotController::subscribeGoals(geometry_msgs::msg::PoseArray goals)
-{
-    // lock mutex and save goals
-    {
-    std::lock_guard<std::mutex> lock(goalsData_.goalsMutex);
-    
-    goalsData_.rawGoals = goals;
-    goalsData_.droneGoals = goals;
-    }
-
-
-    if(goalsData_.rawGoals.poses.size() > 0) {
-
-        // save crop field corner
-        cropData_.rowCorner = goalsData_.rawGoals.poses.back().position;
-
-        // start new nav thread and close previous nav thread if not finished
-        if(threadData_.threadExists == false) {
-            threadData_.navThread = new std::thread(&PathPlanner::navThread, this);
-            threadData_.threadExists = true;
-        }
-        else {                 // This needs to be redone
-            threadData_.navDone = false;
-            stateData_.superState = TRAVELLING;
-            stateData_.changedState = true;
-            feedbackData_.state = "TRAVELLING";
-        }
-    }
-
-    // publish when nav thread is done and delete nav thread?
-
-}
 
 // This whole subscriber needs fixing
 // subscriber callback that listens for obstacles from detection node
@@ -391,10 +325,11 @@ void Robot::RobotController::emergencyCallback(const geometry_msgs::msg::Point::
 {
     // lock feedback mutex
     {
-        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
-        feedbackData_.emergencyReturn = true;
-        feedbackData_.emergencyPosition = *msg;
+        stateData_.emergencyReturn = true;
+        stateData_.emergencyPosition = *msg;
+        stateData_.stateChanged = true;
     }
 
     RCLCPP_INFO(this->get_logger(), "Emergency return to (%.2f, %.2f)", msg->x, msg->y);
@@ -408,37 +343,61 @@ void Robot::RobotController::emergencyCallback(const geometry_msgs::msg::Point::
 void Robot::RobotController::navThread()
 {
 
-    while(threadData_.threadExists == true) {
+    bool threadExists;
+    bool navDone;
 
-        while(threadData_.navDone == false)
+    {
+        std::lock_guard<std::mutex> lock(threadData_.threadMutex);
+
+        threadExists = threadData_.threadExists;
+    }
+
+    while(threadExists == true) {
+
+        {
+        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+        navDone = stateData_.navDone;
+        }
+
+        while(navDone == false)
         {
 
             // clock loop start
             auto loop_start = clock::now();
 
-            // get odo service call to base station
+            // local copy of odometry               
             dronePose_ = RobotController::getOdometry();
 
             //lock feedback mutex
-            {
-                std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-                feedbackData_.currentPosition = dronePose_;
+            bool emergencyReturn;
 
-                bool emergencyReturn = feedbackData_.emergencyReturn;
+            {
+                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                emergencyReturn = stateData_.emergencyReturn;
             }
             
 
             if(emergencyReturn == false) {
 
+                State currentState;
+
+                {
+                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                    currentState = stateData_.superState;
+                }
+
                 // do state actions
-                switch(stateData_.superState)
+                switch(currentState)
                 {
                     // travelling to field guess
                     case TRAVELLING:
 
                         // lock goals mtuex
                         {
-                            std::lock_guard<std::mutex> lock(goalsData_.goalsMutex);
+                            std::lock_guard<std::mutex> lock(goals_.goalsMutex);
 
                             // publish to nav2 and moniter status
                             if(goals_.droneGoals.size() > 0) {
@@ -482,7 +441,7 @@ void Robot::RobotController::navThread()
 
                                             // lock feedback and state mutex
                                             std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
+                                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
                                             stateData_.superState = EMERGENCY;
                                             stateData_.changedState = true;
@@ -500,6 +459,7 @@ void Robot::RobotController::navThread()
                             }
                             else {
                                 std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
                                 stateData_.superState = ALIGNING;
                                 stateData_.changedState = true;
@@ -513,13 +473,31 @@ void Robot::RobotController::navThread()
                     // surveying
                     case SURVEYING:
 
-                        switch(stateData_.surveyingState)
+                        State surveyState;
+
+                        {
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                            surveyState = stateData_.surveyingState;
+                        }   
+
+                        switch(surveyState)
                         {
                             // do a rotation and identify closest (starting row/current row) and second closest (next row) row centre to beacon
                             case ROTATING:
 
                                 // if first loop grab initial bearing
-                                if(stateData_.changedState == true) {
+                                bool changedState;
+
+                                {
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                                    changedState = stateData_.changedState;
+                                }
+
+                                if(changedState == true) {
+
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
                                     stateData_.changedState = false;
 
@@ -532,6 +510,8 @@ void Robot::RobotController::navThread()
                                     std::vector<geometry_msgs::msg::Point> rows = locateInitialRows(processLiDAR(copyLiDAR()));
 
                                     if(rows.size() > 1) {
+                                        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
                                         cropData_.cropCentres = rows;
                                     }
 
@@ -540,9 +520,13 @@ void Robot::RobotController::navThread()
                                     vel.angular.z = manualNavData_.rotate;
                                     cmdVelPub_->publish(vel);
 
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                     // check if robot has rotated enough
                                     if(dronePose_.yaw - stateData_.initSurveyingAngle < 0.1) {
                                         
+                                        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
                                         // ensure it has identified at least 2 bumps
                                         if(cropData_.cropCentres.size() > 1) {
 
@@ -566,8 +550,10 @@ void Robot::RobotController::navThread()
                         // calculate middle of row, calculate direction and distance to move to middle of row (i.e. direction of line, move half distance of line)
                             case CALCULATING:
 
+                                std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
                                 // find closest 2 crop centres
-                                std::vector<geometry_msgs::msg::Point> crops = twoClosest(cropsData_.cropCentres); //alternatively use this to make a local copy of the var
+                                std::vector<geometry_msgs::msg::Point> crops = twoClosest(cropData_.cropCentres); //alternatively use this to make a local copy of the var
 
                                 cropData_.currentCrop = crops.at(0);
                                 cropData_.nextCrop = crops.at(1);
@@ -592,15 +578,26 @@ void Robot::RobotController::navThread()
                                 cropData_.midRowVector.y = cropData_.rowPerpendicular.y * cropData_.midRowScaler;
 
                                 // change sub-state
-                                stateData_.surveyingState = MOVING;
+                                {
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
+                                    stateData_.surveyingState = MOVING;
+                                }
                                 break;
                             
                             // move forward to row middle and turn to face down row (rotate 90 to the right)
                             case S_MOVING:
                                 geometry_msgs::msg::Twist vel;
+                                bool rowAlligned;
+                                {
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
-                                if(stateData_.rowAlligned == false) {
+                                    rowAlligned = stateData_.rowAlligned;
+                                }
+
+                                if(rowAlligned == false) {
+                                    std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
                                     // calculate angle between rowPerpendicular and drone
                                     double angle = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
                                     angle = correctAngle(angle);
@@ -618,10 +615,14 @@ void Robot::RobotController::navThread()
                                         vel.linear = manualNavData_.linear;
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.rowAlligned = true;
                                     }
                                 }
                                 else {
+                                    std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
                                     // calculate angle between rowParallel and drone
                                     double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                                     angle = correctAngle(angle);
@@ -631,7 +632,9 @@ void Robot::RobotController::navThread()
                                     if(dronePose_.yaw - angle > 0.1) {
                                         vel.angular = direction * manualNavData_.rotate;
                                     }
-                                    else { 
+                                    else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+                                        
                                         stateData_.surveyingState = EXITING;
                                     }
                                 }
@@ -643,14 +646,17 @@ void Robot::RobotController::navThread()
                             // switch to sampling
                             case EXITING:
 
-                                std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-                                
-                                // reset state data
-                                stateData_.superState = SAMPLING;
-                                stateData_.surveyingState = ROTATING;
-                                stateData_.changedState = true;
-                                stateData_.rowAlligned = false;
-                                feedbackData_.state = "SAMPLING";
+                                {
+                                    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+                                    
+                                    // reset state data
+                                    stateData_.superState = SAMPLING;
+                                    stateData_.surveyingState = ROTATING;
+                                    stateData_.changedState = true;
+                                    stateData_.rowAlligned = false;
+                                    feedbackData_.state = "SAMPLING";
+                                }
 
                                 break;
                         }
@@ -660,22 +666,45 @@ void Robot::RobotController::navThread()
                     // aligning
                     case ALIGNING:
 
-                        if(stateData_.changedState == true) {
+                        bool changedState;
+                        geometry_msgs::msg::Point checkpoint;
+                        State aligningState;
+
+                        {
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                            changedState = stateData_.changedState;
+                            checkpoint = stateData_.checkpoint;
+                            aligningState = stateData_.aligningState;
+                        }
+
+                        if(changedState == true) {
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                             stateData_.changedState = false;
                             
                             stateData_.aligningState = LEAVING;
                             stateData_.checkpoint = dronePose_.position;
                         }
                         else {
-                            switch(stateData_.aligningState)
+
+                            double midRowScaler;
+
+                            {
+                                std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                midRowScaler = cropData_.midRowScaler;
+                            }
+
+                            switch(aligningState)
                             {
                                 // go forward X
                                 case LEAVING:
 
-                                    double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
+                                    double distance = sqrt(pow(dronePose_.position.x - checkpoint.x, 2) + pow(dronePose_.position.y - checkpoint.y, 2));
 
                                     // if distance is smaller than mid row scaler
-                                    if(distance < cropData_.midRowScaler) {
+                                    if(distance < midRowScaler) {
 
                                         // move forward
                                         geometry_msgs::msg::Twist vel;
@@ -683,15 +712,23 @@ void Robot::RobotController::navThread()
                                         cmdVelPub_->publish(vel);
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.aligningState = TURNING_PERP;
                                         stateData_.checkpoint = dronePose_.position;
                                     }
 
                                     break;
+
                                 // turn 90 degrees to the right or left to face down field side
                                 case TURNING_PERP:
                                     // compute angle bearing
-                                    double angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                                    double angleDesired;
+                                    {
+                                        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                        angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
+                                    }
                                     angleDesired = correctAngle(angleDesired);
                                     double angle = angleDesired - dronePose_.yaw;
                                     angle = correctAngle(angle);
@@ -704,6 +741,8 @@ void Robot::RobotController::navThread()
                                         cmdVelPub_->publish(vel);
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.aligningState = A_MOVING;
                                         stateData_.checkpoint = dronePose_.position;
                                     }
@@ -713,10 +752,10 @@ void Robot::RobotController::navThread()
                                 // go forward X*2
                                 case A_MOVING:
                                     
-                                    double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
+                                    double distance = sqrt(pow(dronePose_.position.x - checkpoint.x, 2) + pow(dronePose_.position.y - checkpoint.y, 2));
 
                                     // if distance is smaller than mid row scaler * 1.5
-                                    if(distance < cropData_.midRowScaler * 2) {
+                                    if(distance < midRowScaler * 2) {
 
                                         // move forward
                                         geometry_msgs::msg::Twist vel;
@@ -724,6 +763,8 @@ void Robot::RobotController::navThread()
                                         cmdVelPub_->publish(vel);
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.aligningState = TURNING_PARA;
                                         stateData_.checkpoint = dronePose_.position;
                                     }
@@ -734,7 +775,14 @@ void Robot::RobotController::navThread()
                                 case TURNING_PARA:
 
                                     // set angle
-                                    if(cropData_.leftTurnRow == true) {
+                                    bool leftTurnRow;
+                                    {
+                                        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                        leftTurnRow = cropData_.leftTurnRow;
+                                    }
+
+                                    if(leftTurnRow == true) {
                                         int direction = -1;
                                     }
                                     else {
@@ -742,7 +790,12 @@ void Robot::RobotController::navThread()
                                     }
                                 
                                     // compute angle bearing
-                                    double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                                    double angleDesired;
+                                    {
+                                        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                        angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                                    }
                                     angleDesired = correctAngle(angleDesired);
                                     double angle = angleDesired - dronePose_.yaw;
                                     angle = correctAngle(angle);
@@ -756,6 +809,8 @@ void Robot::RobotController::navThread()
                                         cmdVelPub_->publish(vel);
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.aligningState = ENTERING;
                                         stateData_.checkpoint = dronePose_.position;
                                     }
@@ -763,10 +818,10 @@ void Robot::RobotController::navThread()
                                 // go forward X*1.5
                                 case ENTERING:
 
-                                    double distance = sqrt(pow(dronePose_.position.x - stateData_.checkpoint.x, 2) + pow(dronePose_.position.y - stateData_.checkpoint.y, 2));
+                                    double distance = sqrt(pow(dronePose_.position.x - checkpoint.x, 2) + pow(dronePose_.position.y - checkpoint.y, 2));
 
                                     // if distance is smaller than mid row scaler * 1.5
-                                    if(distance < cropData_.midRowScaler * 1.5) {
+                                    if(distance < midRowScaler * 1.5) {
 
                                         // move forward
                                         geometry_msgs::msg::Twist vel;
@@ -774,6 +829,8 @@ void Robot::RobotController::navThread()
                                         cmdVelPub_->publish(vel);
                                     }
                                     else {
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
                                         stateData_.aligningState = CHECKING;
                                         stateData_.checkpoint = dronePose_.position;
                                     }
@@ -790,6 +847,7 @@ void Robot::RobotController::navThread()
                                         std::vector<geometry_msgs::msg::Point> crops = determineRows(processLiDAR(copyLiDAR()));
 
                                         std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
                                         
                                         // if there is a row on either side of the drone
                                         if(crops.size() == 2) {
@@ -803,7 +861,8 @@ void Robot::RobotController::navThread()
                                             stateData_.superState = IDLE;                    
                                             stateData_.changedState = true;
                                             feedbackData_.state = "IDLE";
-                                            theadData_.navDone = true;
+
+                                            stateData_.navDone = true;
                                         }
                                         else {
                                             // we are not in a row and there has been an issue switch to emergency
@@ -815,7 +874,14 @@ void Robot::RobotController::navThread()
                                     }
                                     else {
                                         // set angle
-                                        if(cropData_.leftTurnRow == true) {
+                                        bool leftTurnRow;
+                                        {
+                                            std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                            leftTurnRow = cropData_.leftTurnRow;
+                                        }
+                                        
+                                        if(leftTurnRow == true) {
                                             int direction = -1;
                                         }
                                         else {
@@ -823,7 +889,12 @@ void Robot::RobotController::navThread()
                                         }
                                     
                                         // compute angle bearing
-                                        double angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                                        double angleDesired;
+                                        {
+                                            std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                            angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                                        }
                                         angleDesired = correctAngle(angleDesired);
                                         double angle = angleDesired - dronePose_.yaw;
                                         angle = correctAngle(angle);
@@ -843,20 +914,34 @@ void Robot::RobotController::navThread()
                     // sampling
                     case SAMPLING:
 
-                        //make local copy of LiDAR data
+                        bool changedState;
+
+                        {
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                            changedState = stateData_.changedState;
+                        }
 
                         // if just changed state
-                        if(stateData_.changedState == true) {
+                        if(changedState == true) {
+
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
                             
                             stateData_.changedState = false;
                             
                             querySoil();
+
                         }
                         else {
                             geometry_msgs::msg::Twist vel;
 
                             // drone allignment check and lidar processing
-                            double angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            double angle;
+                            {
+                                std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+                                angle = atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
+                            }
                             angle = correctAngle(angle);
                             int direction = angle / abs(angle);
 
@@ -867,6 +952,7 @@ void Robot::RobotController::navThread()
                             if(rows.size() < 2) {
 
                                 std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
                                 stateData_.superState = ALIGNING;
                                 stateData_.changedState = true;
@@ -902,6 +988,7 @@ void Robot::RobotController::navThread()
                                 vel.linear = 0;
 
                                 std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
                                 
                                 // switch to emergency
                                 stateData_.superState = EMERGENCY;
@@ -914,7 +1001,7 @@ void Robot::RobotController::navThread()
                             double distance = sqrt(pow(dronePose_.position.x - soil_.soilPose.position.x, 2) + pow(dronePose_.position.y - soil_.soilPose.position.y, 2));
 
                             // if distance greater than X
-                            if(distance > stateData_.minSampleDistance) {
+                            if(distance > minSampleDistance_) {
                                 
                                 querSoil();
                             
@@ -930,17 +1017,21 @@ void Robot::RobotController::navThread()
 
                     // emergency
                     case EMERGENCY:
+                        bool changedState;
 
-                        if(stateData_.changedState == true) {
+                        {
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                            changedState = stateData_.changedState;
+                        }
+
+                        if(changedState == true) {
+
+                            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+                            std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
                             stateData_.changedState = false;
-
-                            // lock mutex for feedback data
-                            {
-                                std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
-
-                                feedbackData_.emergency = true;
-                            }
+                            feedbackData_.emergency = true;
                         
                         }
 
@@ -949,16 +1040,31 @@ void Robot::RobotController::navThread()
             }
             else {
 
-                // publish to nav2 to travel to point
-                {
-                    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                bool changedState;
 
-                    geometry_msgs::msg::Pose goal;
-                    goal.pose.position = feedbackData_.emergencyPosition;
-                    goal.pose.theta = 0;
+                // lock state mutex
+                {
+                    std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                    changedState = stateData_.changedState;
                 }
 
-                publishNavGoals(goal);
+                if(changedState == true) {
+
+                    // publish to nav2 to travel to point
+                    {
+                        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                        std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+                        
+                        stateData_.changedState = false;
+
+                        geometry_msgs::msg::Pose goal;
+                        goal.pose.position = feedbackData_.emergencyPosition;
+                        goal.pose.theta = 0;
+                    }
+
+                    publishNavGoals(goal);
+                }
             }
         
             // clock loop end
@@ -969,13 +1075,25 @@ void Robot::RobotController::navThread()
             // sleep if necessary
             if (sleep_time > std::chrono::nanoseconds(0)) {
                 std::this_thread::sleep_for(sleep_time);
-            }   
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                navDone = stateData_.navDone;
+            }
 
             
         }
         
         // sleep thread for 500ms while its not doing anything (aka idle state)
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        {
+            std::lock_guard<std::mutex> lock(threadData_.threadMutex);
+
+            bool threadExists = threadData_.threadExists;
+        }
 
     }
 // exit main loop
@@ -996,17 +1114,49 @@ nav_msgs::msg::Odometry Robot::RobotController::getOdometry()
 // getter for current goal
 geometry_msgs::msg::Point Robot::RobotController::getGoal()
 {
+    std::lock_guard<std::mutex> lock(goals_.goalsMutex);
+
     return goals_.currentGoal; //Set goal position to the currently active goal being navigated to
 }
 
 
 // setter for goals
-void Robot::RobotController::setGoals(std::vector<geometry_msgs::msg::Point> goals)
+void Robot::RobotController::setGoals(geometry_msgs::msg::PoseArray goals)
 {
-    std::lock_guard<std::mutex> lock(goalsData_.goalsMutex);
-
+    // lock mutex and save goals
+    std::lock_guard<std::mutex> lock(goals_.goalsMutex);
+    
     goals_.rawGoals = goals;
     goals_.droneGoals = goals;
+
+    if(goals_.rawGoals.poses.size() > 0) {
+
+        // save crop field corner
+        {
+            std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+            cropData_.rowCorner = goals_.rawGoals.poses.back().position;
+        }
+
+        // lock thread mutex
+        std::lock_guard<std::mutex> lock(threadData_.mutex);
+
+        // start new nav thread and close previous nav thread if not finished
+        if(threadData_.threadExists == false) {
+            threadData_.navThread = new std::thread(&PathPlanner::navThread, this);
+            threadData_.threadExists = true;
+        }
+        else {
+            //lock state mutex and set state to travelling
+            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+            std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
+            stateData_.navDone = false;
+            stateData_.superState = TRAVELLING;
+            stateData_.changedState = true;
+            feedbackData_.state = "TRAVELLING";
+        }
+    }
 }
 
 
@@ -1057,9 +1207,11 @@ double Robot::RobotController::correctAngle(double angle)
 // find 2 closest points on each object
 std::vector<geometry_msgs::msg::Point> Robot::RobotController::twoClosest(std::vector<geometry_msgs::msg::Point> closestPoints)
 {
+    dronePose = getOdometry();
+
     // save closest 2 points
     geometry_msgs::msg::Point closestPoint = closestPoints.at(0);
-    double closestDist = sqrt(pow(closestPoint.x - dronePose_.position.x, 2) + pow(closestPoint.y - dronePose_.position.y, 2));
+    double closestDist = sqrt(pow(closestPoint.x - dronePose.position.x, 2) + pow(closestPoint.y - dronePose.position.y, 2));
     geometry_msgs::msg::Point nextClosestPoint = closestPoint;
     double nextClostestDist = closestDist;
     int pointTracker = 0;
@@ -1068,7 +1220,7 @@ std::vector<geometry_msgs::msg::Point> Robot::RobotController::twoClosest(std::v
         if(pointTracker != 0) {
 
             // check if new closest point
-            double dist = sqrt(pow(point.x - dronePose_.position.x, 2) + pow(point.y - dronePose_.position.y, 2));
+            double dist = sqrt(pow(point.x - dronePose.position.x, 2) + pow(point.y - dronePose.position.y, 2));
 
             if(dist < closestDist) {    // if new closest point
                 nextClosestPoint = closestPoint;
@@ -1181,6 +1333,15 @@ std::vector<geometry_msgs::msg::Point> Robot::RobotController::determineRows(std
     double maxZ = 0;
     int maxIndex = 0;
 
+    double midRowScaler;
+    double bumpThreshold;
+    {
+        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+        midRowScaler = cropData_.midRowScaler;
+        bumpThreshold = cropData_.bumpThreshold;
+    }
+
     // check number of bumps greater than bum threshold
     for(int i = 0; i < lidar.size(); i++) {
         
@@ -1188,10 +1349,11 @@ std::vector<geometry_msgs::msg::Point> Robot::RobotController::determineRows(std
         double distance = sqrt(pow(lidar.at(i).x - dronePose_.position.x, 2) + pow(lidar.at(i).y - dronePose_.position.y, 2));
         
         // check it is an adjacent row
-        if(distance > cropData_.midRowScaler * 1.5) {
+
+        if(distance > midRowScaler * 1.5) {
 
             // check it is a genuine bump
-            if(lidar.at(i).z > cropData_.bumpThreshold) {
+            if(lidar.at(i).z > bumpThreshold) {
 
                 // check if new row
                 if(newRow == true) {
@@ -1232,11 +1394,19 @@ std::vector<geometry_msgs::msg::Point> Robot::RobotController::locateInitialRows
     double maxZ = 0;
     int maxIndex = 0;
 
+    double bumpThreshold;
+    {
+        std::lock_guard<std::mutex> lock(cropData_.cropMutex);
+
+        bumpThreshold = cropData_.bumpThreshold;
+    }
+
     // check number of bumps greater than bum threshold
     for(int i = 0; i < lidar.size(); i++) {
     
+
         // check it is a genuine bump
-        if(lidar.at(i).z > cropData_.bumpThreshold) {
+        if(lidar.at(i).z > bumpThreshold) {
 
             // check if new row
             if(newRow == true) {
@@ -1269,16 +1439,20 @@ std::vector<geometry_msgs::msg::Point> Robot::RobotController::locateInitialRows
 // check if any known obstacles are within range of the drone
 bool Robot::RobotController::isObstacleInRange(geometry_msgs::msg::Point point)
 {
+    geometry_ msgs::PoseArray objects;
+    double minRange;
+
     // lock obstacles mutex
     {
         std::lock_guard<std::mutex> lock(objects_.objectMutex);
 
-        geometry_ msgs::PoseArray objects = objects_.objectPoints;
+        objects = objects_.objectPoints;
+        minRange = objects_.minRange;
     }
 
         // check if any obstacles are within range of the drone
         for(auto obstacle : objects) {
-            if(sqrt(pow(point.x - obstacle.position.x, 2) + pow(point.y - obstacle.position.y, 2)) < objects_.minRange) {
+            if(sqrt(pow(point.x - obstacle.position.x, 2) + pow(point.y - obstacle.position.y, 2)) < minRange) {
                 return true;
             }
         }
@@ -1292,15 +1466,17 @@ bool Robot::RobotController::autoNavigate()
 {
     // lock goal mutex
     {
-        std::lock_guard<std::mutex> lock(goalsData_.goalsMutex);
+        std::lock_guard<std::mutex> lock(goals_.goalsMutex);
 
         // if goals raw exist
         if(goals_.rawGoals.poses.size() > 0) {
 
-            //if nav thread is not running
-            if(threadData_.navDone == false) {
+            std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
-                threadData_.navDone = true;
+            //if nav thread is not running
+            if(stateData_.navDone == false) {
+
+                stateData_.navDone = true;
 
             }
             else {
@@ -1325,13 +1501,11 @@ void Robot::RobotController::querySoil()
 {
     if(registered_station_ != ""){
 
-        nav_msgs::msg::Odometry last_query_odom;
-
         {
             std::lock_guard<std::mutex> lock(soil_.soilMutex);
             
             soil_.soilPose = getOdometry();
-            last_query_odom = soil_.soilPose;
+            last_query_odom_ = soil_.soilPose;
         
         }
 
