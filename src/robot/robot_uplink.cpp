@@ -9,7 +9,7 @@ Robot::RobotUplink::RobotUplink(std::string serial_id) :
     battery_(69),
     state_("MENTAL_CRISIS")
 {
-    //controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
+    controller_ = std::make_shared<RobotController>(serial_id_, shared_from_this());
 
     geometry_msgs::msg::Point dummy;
     dummy.x = 69.0;
@@ -53,13 +53,17 @@ void Robot::RobotUplink::goalCallback(const unomas::msg::AddressedPoseArray::Sha
         RCLCPP_WARN(this->get_logger(), "Received goals intended for '%s', but this robot's serial ID is '%s'. Ignoring.", msg->address.c_str(), serial_id_.c_str());
         return;
     }
-    std::vector<geometry_msgs::msg::Point> goals;
-    for (const auto& pose : msg->poses) {
-        goals.push_back(pose.position);
-    }
-    //controller_->setGoals(goals);
-    RCLCPP_INFO(this->get_logger(), "Received %zu goals for robot '%s'.", goals.size(), serial_id_.c_str());
-    //controller_->autoNavigate();
+    // std::vector<geometry_msgs::msg::Point> goals;
+    // for (const auto& pose : msg->poses) {
+    //     goals.push_back(pose.position);
+    // }
+
+    geometry_msgs::msg::PoseArray goals_msg;
+    goals_msg.poses = msg->poses;
+
+    controller_->setGoals(goals_msg);
+    RCLCPP_INFO(this->get_logger(), "Received %zu goals for robot '%s'.", goals_msg.poses.size(), serial_id_.c_str());
+    controller_->autoNavigate();
 }
 
 void Robot::RobotUplink::UplinkTimerCallback()

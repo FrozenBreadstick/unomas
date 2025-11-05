@@ -2,7 +2,7 @@
 #define ROBOT_UPLINK_H
 
 #include "rclcpp/rclcpp.hpp"
-//#include "robot_controller.h" 
+#include "robot_controller.h" 
 
 #include "geometry_msgs/msg/pose_array.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -23,7 +23,7 @@ namespace Robot {
             ~RobotUplink();
 
         private:
-            // std::shared_ptr<Robot::RobotController> controller_;
+            std::shared_ptr<Robot::RobotController> controller_;
             
             void UplinkTimerCallback();
             
