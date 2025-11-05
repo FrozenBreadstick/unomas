@@ -92,6 +92,7 @@ ament_target_dependencies(robot
  rclcpp
  geometry_msgs
  nav_msgs
+ sensor_msgs
 )
 
 #install executables to lib
@@ -100,7 +101,6 @@ install(
     base_station
     ui_bridge
     simulation_extras
-    robot
     robot
   DESTINATION lib/${PROJECT_NAME}
 )
