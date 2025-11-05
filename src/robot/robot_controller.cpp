@@ -515,7 +515,8 @@ void Robot::RobotController::navThread()
 
                                     stateData_.changedState = false;
 
-                                    stateData_.initSurveyingAngle = dronePose_.pose.pose.orientation.z;
+                                    stateData_.initSurveyingAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                    stateData_.initSurveyingAngle = correctAngle(stateData_.initSurveyingAngle);
                                     stateData_.startedRotating = false;
                                 }
                                 else {
@@ -537,7 +538,10 @@ void Robot::RobotController::navThread()
                                     std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
                                     // check if robot has rotated enough
-                                    if(dronePose_.pose.pose.orientation.z - stateData_.initSurveyingAngle < 0.1) {
+                                    double droneAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                    droneAngle = correctAngle(droneAngle);
+
+                                    if(droneAngle - stateData_.initSurveyingAngle < 0.1) {
                                         
                                         std::lock_guard<std::mutex> lock(cropData_.cropMutex);
 
@@ -633,8 +637,11 @@ void Robot::RobotController::navThread()
                                     // calculate magnitude of distance from corner to drone
                                     double distance = sqrt(pow(dronePose_.pose.pose.position.x - cropData_.rowCorner.x, 2) + pow(dronePose_.pose.pose.position.y - cropData_.rowCorner.y, 2));
 
+                                    double droneAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                    droneAngle = correctAngle(droneAngle);
+
                                     // check if drone is facing perp to row and close to mid row
-                                    if(dronePose_.pose.pose.orientation.z - angle > 0.1) {
+                                    if(droneAngle - angle > 0.1) {
 
                                         vel.angular.z = direction * manualNavData_.rotate;
                                     }
@@ -655,8 +662,11 @@ void Robot::RobotController::navThread()
                                     angle = correctAngle(angle);
                                     int direction = angle / abs(angle);
 
+                                    double droneAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                    droneAngle = correctAngle(droneAngle);
+
                                     // check if drone is facing down row
-                                    if(dronePose_.pose.pose.orientation.z - angle > 0.1) {
+                                    if(droneAngle - angle > 0.1) {
                                         vel.angular.z = direction * manualNavData_.rotate;
                                     }
                                     else {
@@ -772,7 +782,7 @@ void Robot::RobotController::navThread()
                                         angleDesired = atan2(cropData_.rowPerpendicular.y, cropData_.rowPerpendicular.x);
                                     }
                                     angleDesired = correctAngle(angleDesired);
-                                    double angle = angleDesired - dronePose_.pose.pose.orientation.z;
+                                    double angle = angleDesired - correctAngle(quaternionToYaw(dronePose_.pose.pose.orientation));
                                     angle = correctAngle(angle);
                                     int direction = angle / abs(angle);
 
@@ -845,7 +855,7 @@ void Robot::RobotController::navThread()
                                         angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                                     }
                                     angleDesired = correctAngle(angleDesired);
-                                    double angle = angleDesired - dronePose_.pose.pose.orientation.z;
+                                    double angle = angleDesired - correctAngle(quaternionToYaw(dronePose_.pose.pose.orientation));
                                     angle = correctAngle(angle);
 
                                     // check if drone is facing the right direction
@@ -903,7 +913,10 @@ void Robot::RobotController::navThread()
                                     }
                                     angle = correctAngle(angle);
 
-                                    if(dronePose_.pose.pose.orientation.z - angle > 0.1) {
+                                    double droneAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                    droneAngle = correctAngle(droneAngle);
+
+                                    if(droneAngle - angle > 0.1) {
 
                                         // check there is a row on either side of the drone using ground lidar
                                         std::vector<geometry_msgs::msg::Point> crops = determineRows(processLiDAR(copyLiDAR()));
@@ -983,7 +996,7 @@ void Robot::RobotController::navThread()
                                             angleDesired = direction * atan2(cropData_.rowParallel.y, cropData_.rowParallel.x);
                                         }
                                         angleDesired = correctAngle(angleDesired);
-                                        double angle = angleDesired - dronePose_.pose.pose.orientation.z;
+                                        double angle = angleDesired - correctAngle(quaternionToYaw(dronePose_.pose.pose.orientation));
                                         angle = correctAngle(angle);
                                     
                                         geometry_msgs::msg::Twist vel;
@@ -1065,8 +1078,11 @@ void Robot::RobotController::navThread()
 
                                 double diff = distLeft - distRight;
                             
+                                double droneAngle = quaternionToYaw(dronePose_.pose.pose.orientation);
+                                droneAngle = correctAngle(droneAngle);
+
                                 // check facing direction of drone
-                                if(dronePose_.pose.pose.orientation.z - angle > 0.1) {
+                                if(droneAngle - angle > 0.1) {
                                     vel.angular.z = direction * manualNavData_.rotate;
                                 }
                                 // check robot has not drifted too close to one side of the row
@@ -1327,6 +1343,23 @@ double Robot::RobotController::correctAngle(double angle)
     }
 
     return angle;
+}
+
+
+// Quat to Yaw
+double quaternionToYaw(geometry_msgs::msg::Quaternion q)
+{
+    double x = q.x;
+    double y = q.y;
+    double z = q.z;
+    double w = q.w;
+
+    // Calculate yaw (rotation around Z-axis)
+    double siny_cosp = 2.0 * (w * z + x * y);
+    double cosy_cosp = 1.0 - 2.0 * (y * y + z * z);
+    double yaw = std::atan2(siny_cosp, cosy_cosp);
+    
+    return yaw; // in radians
 }
 
 

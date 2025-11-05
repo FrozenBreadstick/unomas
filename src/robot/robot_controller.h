@@ -188,6 +188,15 @@ namespace Robot {
             double correctAngle(double angle);
 
 
+            /*! @brief Quat to Yaw
+             *
+             *  @param[in] q - quaternion
+             * 
+             *  @return double - yaw
+             */
+            double quaternionToYaw(geometry_msgs::msg::Quaternion q);
+
+
             /*! @brief find 2 closest points on each object
              *
              *  @param[in] closestPoints - vector of closest points
