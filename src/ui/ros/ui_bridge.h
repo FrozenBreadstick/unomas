@@ -8,6 +8,10 @@
 #include "unomas/srv/terrain_soil_data.hpp"
 #include "unomas/msg/soil_info.hpp"
 
+
+#include "unomas/srv/dummy_trigger.hpp"
+#include "unomas/msg/addressed_pose_array.hpp"
+
 namespace UI
 {
     class UIBridge : public rclcpp::Node
@@ -29,13 +33,17 @@ namespace UI
             rclcpp::Service<unomas::srv::TerrainSoilData>::SharedPtr terrain_soil_service_;
             void terrainSoilServiceCallback(
                 const std::shared_ptr<unomas::srv::TerrainSoilData::Request> request,
-                std::shared_ptr<unomas::srv::TerrainSoilData::Response> response
-            );
+                std::shared_ptr<unomas::srv::TerrainSoilData::Response> response);
 
             void soilInfoSubCallback(const unomas::msg::SoilInfo::SharedPtr msg);
             rclcpp::Subscription<unomas::msg::SoilInfo>::SharedPtr soil_info_subscriber_;
             std::vector<unomas::msg::SoilInfo> soil_data_;
             std::mutex soil_data_lock_;
+
+            void debugPoseServiceCallback(const std::shared_ptr<unomas::srv::DummyTrigger::Request> request,
+            std::shared_ptr<unomas::srv::DummyTrigger::Response> response);
+            rclcpp::Service<unomas::srv::DummyTrigger>::SharedPtr debug_pose_service_;
+            rclcpp::Publisher<unomas::msg::AddressedPoseArray>::SharedPtr debug_pose_publisher_;
     };
 }
 

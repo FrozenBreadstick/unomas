@@ -19,6 +19,11 @@ UI::UIBridge::UIBridge() : Node("ui_bridge_node")
         "soil_update",
         std::bind(&UI::UIBridge::terrainSoilServiceCallback, this, std::placeholders::_1, std::placeholders::_2)
     );
+
+    debug_pose_service_ = this->create_service<unomas::srv::DummyTrigger>(
+        "testPoseArray",
+        std::bind(&UI::UIBridge::debugPoseServiceCallback, this, std::placeholders::_1, std::placeholders::_2)
+    );
 }
 
 UI::UIBridge::~UIBridge()
@@ -59,4 +64,33 @@ void UI::UIBridge::soilInfoSubCallback(const unomas::msg::SoilInfo::SharedPtr ms
     std::lock_guard<std::mutex> lock(soil_data_lock_);
     soil_data_.push_back(*msg);
     RCLCPP_INFO(this->get_logger(), "Received soil info at (%.2f, %.2f).", msg->x, msg->y);
+}
+
+void UI::UIBridge::debugPoseServiceCallback(const std::shared_ptr<unomas::srv::DummyTrigger::Request> request,
+            std::shared_ptr<unomas::srv::DummyTrigger::Response> response)
+{
+    std::string topic = request->message + "/goals";
+    debug_pose_publisher_ = this->create_publisher<unomas::msg::AddressedPoseArray>(topic, 10);
+
+    unomas::msg::AddressedPoseArray array;
+
+    for (int i = 0; i < 3; ++i)
+    {
+      geometry_msgs::msg::Pose pose;
+      pose.position.x = static_cast<float>(std::rand() % 10);
+      pose.position.y = static_cast<float>(std::rand() % 10);
+      pose.position.z = 0.0;
+      pose.orientation.w = 1.0;
+      pose.orientation.x = 0.0;
+      pose.orientation.y = 0.0;
+      pose.orientation.z = 0.0;
+      array.poses.push_back(pose);
+    }
+
+    array.address = request->message2;
+
+    debug_pose_publisher_->publish(array);
+    
+    response->message3 = "";
+    response->message4 = "";
 }
