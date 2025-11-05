@@ -2,198 +2,339 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>UNO MAS · Robot Dashboard</title>
+<title>UNO MAS · Robot Dashboard + Soil Overlays</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root{
-      --bg:#0b0d12; --panel:#121622; --muted:#9aa3b2; --text:#e8edf4;
-      --accent:#4aa3ff; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --card:#151a28;
-      --border:#202636;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; background:radial-gradient(1200px 800px at 20% -10%, #0f1422 0, #0b0d12 60%),
-      linear-gradient(180deg,#0b0d12,#0b0d12);
-      color:var(--text); font:16px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;
-      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-      display:flex; flex-direction:column;
-    }
-    header{padding:20px 24px; border-bottom:1px solid var(--border); background:#0c111b88; backdrop-filter: blur(6px);}
-    header h1{margin:0; font-size:18px; font-weight:600; letter-spacing:.2px}
-    header h1 span{opacity:.8; font-weight:400}
-    main{max-width:980px; width:100%; margin:28px auto; padding:0 16px; flex:1}
-    .grid{display:grid; gap:16px; grid-template-columns:1.2fr .8fr}
-    @media (max-width:860px){.grid{grid-template-columns:1fr}}
-    .card{
-      background:linear-gradient(180deg, #151b2a, #121826);
-      border:1px solid var(--border); border-radius:14px; padding:18px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-    }
-    .header-row{display:flex; align-items:center; gap:12px; margin-bottom:12px}
-    .name{font-size:22px; font-weight:700; letter-spacing:.3px}
-    .muted{color:var(--muted)}
-    .badge{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 10px; border-radius:999px; font-size:13px; border:1px solid var(--border);
-      background:#0e1422;
-    }
-    #status-panel { flex: 0.2; min-height: 150px; }
-    .dot{width:8px;height:8px;border-radius:50%}
-    .dot.idle{background:var(--muted)}
-    .dot.active{background:var(--ok)}
-    .dot.warn{background:var(--warn)}
-    .dot.err{background:var(--err)}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:13px; background:#101728}
-    .row{display:flex; gap:12px; flex-wrap:wrap}
-    .section-title{font-size:14px; color:var(--muted); margin:14px 0 8px}
-    .kpi{
-      display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
-    }
-    @media (max-width:520px){.kpi{grid-template-columns:1fr 1fr}}
-    .kpi .tile{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px}
-    .kpi .label{color:var(--muted); font-size:12px; letter-spacing:.2px}
-    .kpi .value{font-size:18px; margin-top:4px; font-weight:600}
-    .stack{display:grid; gap:12px}
-    .progress-wrap{display:flex; align-items:center; gap:12px}
-    .progress{flex:1; height:10px; background:#0e1420; border:1px solid var(--border); border-radius:999px; overflow:hidden}
-    .progress > span{display:block; height:100%; background:linear-gradient(90deg,#4aa3ff,#22c55e)}
-    .kv{display:grid; grid-template-columns:130px 1fr; gap:6px 14px; align-items:center}
-    .code{background:#0e1420; border:1px dashed #22304a; color:#cfe1ff; padding:10px 12px; border-radius:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; overflow:auto}
-    footer{padding:18px 24px; border-top:1px solid var(--border); color:var(--muted)}
-    .right{margin-left:auto}
-  /* Right map */
-  #map-area{flex:1; min-width: 700px;}
-  canvas{max-width:100%;height:auto;border-left:1px solid var(--border);background:#0e1420;}
+    --bg:#0b0d12; --panel:#121622; --muted:#9aa3b2; --text:#e8edf4;
+    --accent:#4aa3ff; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --card:#151a28;
+    --border:#202636;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:#0b0d12;color:var(--text);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column}
+  header{padding:16px 22px;border-bottom:1px solid var(--border);background:#0c111b99;backdrop-filter:blur(6px)}
+  header h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.2px}
+  main{display:flex;flex-direction:row;height:calc(100vh - 60px)}
+  @media(max-width:1000px){main{flex-direction:column;height:auto}}
+  /* Status panel smaller, map larger */
+  #status-panel{flex:0.22;min-width:260px;padding:18px;border-right:1px solid var(--border);background:linear-gradient(180deg,#151b2a,#121826)}
+  #map-area{flex:0.78;position:relative;display:flex;align-items:center;justify-content:center}
+  .muted{color:var(--muted)}
+  .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:13px;background:#101728}
+  .dot{width:8px;height:8px;border-radius:50%}.dot.idle{background:var(--muted)}.dot.active{background:var(--ok)}.dot.err{background:var(--err)}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);font-size:13px;background:#101728}
+  .progress-wrap{display:flex;align-items:center;gap:10px;margin:8px 0 20px}
+  .progress{flex:1;height:10px;background:#0e1420;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .progress>span{display:block;height:100%;background:linear-gradient(90deg,#4aa3ff,#22c55e)}
+  .kvs{display:grid;grid-template-columns:120px 1fr;gap:6px 12px}
+  /* Map + overlays */
+  canvas{max-width:100%;height:auto;background:#0e1420}
+  #baseCanvas{border-left:1px solid var(--border)}
+  #overlayCanvas{position:absolute;inset:0;pointer-events:none}
+  #controls{position:absolute;top:12px;left:12px;display:flex;gap:10px;flex-wrap:wrap;background:#0c111bcc;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  #controls label{display:flex;align-items:center;gap:8px;font-size:13px}
+  #controls input[type="checkbox"]{transform:scale(1.2)}
+  #controls .row{display:flex;gap:12px;align-items:center}
+  #legend{position:absolute;bottom:12px;left:12px;background:#0c111bcc;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px}
 </style>
 </head>
 <body>
-<header>
-  <h1>UNO MAS · Robot Dashboard</h1>
-</header>
+<header><h1>UNO MAS · Robot Dashboard</h1></header>
 
 <main>
-    
-  <div class="grid">
-      <!-- Left: Primary status -->
-      <section class="card">
-        <div class="header-row">
-          <div class="name" id="name">—</div>
-          <span class="badge" id="state-badge"><span class="dot idle"></span><strong id="state">—</strong></span>
-          <span class="pill" id="emergency-pill"><span class="muted">Emergency</span>: <span id="emergency">—</span></span>
-          <span class="pill right muted" id="updated-pill"><span class="muted">Updated</span>: <span id="updated">—</span></span>
-        </div>
+  <!-- STATUS -->
+  <section id="status-panel">
+    <h3 style="margin:0 0 8px 0">Status</h3>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <strong id="name">—</strong>
+      <span class="badge" id="state-badge"><span class="dot idle"></span><span id="state">IDLE</span></span>
+    </div>
+    <div class="pill" id="emergency-pill"><span class="muted">Emergency</span>: <span id="emergency">—</span></div>
+    <div class="progress-wrap" style="margin-top:12px">
+      <div class="progress"><span id="battery-bar" style="width:0%"></span></div>
+      <strong id="battery-text">0%</strong>
+    </div>
 
-        <div class="section-title">Battery</div>
-        <div class="progress-wrap">
-          <div class="progress" aria-label="Battery">
-            <span id="battery-bar" style="width:0%"></span>
-          </div>
-          <strong id="battery-text">0%</strong>
-        </div>
+    <div class="kvs">
+      <div class="muted">Current X</div><div id="cur-x">—</div>
+      <div class="muted">Current Y</div><div id="cur-y">—</div>
+      <div class="muted">Current Z</div><div id="cur-z">—</div>
+      <div class="muted">Target X</div><div id="tgt-x">—</div>
+      <div class="muted">Target Y</div><div id="tgt-y">—</div>
+      <div class="muted">Target Z</div><div id="tgt-z">—</div>
+      <div class="muted">Updated</div><div id="updated">—</div>
+    </div>
+  </section>
 
-        <div class="section-title">Positions</div>
-        <div class="kpi">
-          <div class="tile">
-            <div class="label">Current X</div>
-            <div class="value" id="cur-x">—</div>
-          </div>
-          <div class="tile">
-            <div class="label">Current Y</div>
-            <div class="value" id="cur-y">—</div>
-          </div>
-          <div class="tile">
-            <div class="label">Current Z</div>
-            <div class="value" id="cur-z">—</div>
-          </div>
-          <div class="tile">
-            <div class="label">Target X</div>
-            <div class="value" id="tgt-x">—</div>
-          </div>
-          <div class="tile">
-            <div class="label">Target Y</div>
-            <div class="value" id="tgt-y">—</div>
-          </div>
-          <div class="tile">
-            <div class="label">Target Z</div>
-            <div class="value" id="tgt-z">—</div>
-          </div>
-        </div>
-      </section>
-
-  <!-- MAP PANEL -->
+  <!-- MAP -->
   <section id="map-area">
-    <canvas id="cv" width="800" height="800"></canvas>
+    <canvas id="baseCanvas" width="900" height="900"></canvas>
+    <canvas id="overlayCanvas" width="900" height="900"></canvas>
+
+    <!-- Overlay controls -->
+    <div id="controls">
+      <div class="row">
+        <label><input id="chk-moist" type="checkbox" checked> Moisture</label>
+        <label><input id="chk-ph"    type="checkbox"> pH</label>
+        <label><input id="chk-nutr"  type="checkbox"> Nutrients</label>
+      </div>
+      <div class="row">
+        <label>Smooth <input id="radius" type="range" min="8" max="45" value="22"></label>
+        <label>Res <input id="res" type="range" min="80" max="300" value="180"></label>
+        <label>Opacity <input id="alpha" type="range" min="20" max="100" value="65"></label>
+      </div>
+    </div>
+    <div id="legend" class="muted">Overlays: Moisture (orange→blue), pH (red→purple), Nutrients (brown→green)</div>
   </section>
 </main>
 
 <script>
+/** ----- CONFIG ----- **/
 const WORLD_SIZE=135, HALF=WORLD_SIZE/2;
-const IMG_URL="/static/EnvTopView.png";
-const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
-const img=new Image(); img.src=IMG_URL; img.onload=draw;
-let last={name:"—",state:"IDLE",battery:0,emergency:false,pos:{x:0,y:0},tgt:{x:0,y:0}};
+const IMG_URL="/static/EnvTopView.png"; // change if you serve it elsewhere
 
-// helpers
-function worldToScreen(x,y){const s=cv.width/WORLD_SIZE;return{x:cv.width/2+x*s,y:cv.height/2-y*s};}
-function drawGrid(){
-  const s=cv.width/WORLD_SIZE; ctx.lineWidth=1;
+/** ----- CANVASES ----- **/
+const base = document.getElementById('baseCanvas');
+const over = document.getElementById('overlayCanvas');
+const bctx = base.getContext('2d');
+const octx = over.getContext('2d');
+const bgImg = new Image(); bgImg.src = IMG_URL; bgImg.onload = drawAll;
+
+/** ----- STATUS STATE ----- **/
+let statusData = {name:"—", current_state:"IDLE", battery:0, emergency:false,
+                  current_position:{x:0,y:0,z:0}, target_position:{x:0,y:0,z:0}};
+
+/** ----- SOIL DATA STATE (array of {x,y,moisture,ph,nutrients}) ----- **/
+let soilSamples = [];  // filled from /api/soil
+
+/** ----- UTILS ----- **/
+function worldToScreen(x,y){ const s=base.width/WORLD_SIZE; return { x: base.width/2 + x*s, y: base.height/2 - y*s }; }
+function drawGrid(ctx){
+  const s = base.width/WORLD_SIZE;
+  ctx.lineWidth=1;
   for(let u=Math.ceil(-HALF);u<=Math.floor(HALF);u++){
     const vx=worldToScreen(u,0).x, hy=worldToScreen(0,u).y;
-    ctx.strokeStyle=(u===0)?"#52a2ff55":(u%10===0?"#ffffff22":u%5===0?"#ffffff17":"#ffffff10");
-    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,cv.height);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(cv.width,hy);ctx.stroke();
+    ctx.strokeStyle=(u===0)?"#52a2ff66":(u%10===0?"#ffffff22":u%5===0?"#ffffff14":"#ffffff0f");
+    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,base.height);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(base.width,hy);ctx.stroke();
   }
 }
-function drawBackground(){
-  const iw=img.width,ih=img.height,cw=cv.width,ch=cv.height;
-  const r=Math.max(cw/iw,ch/ih);const dw=iw*r,dh=ih*r;const dx=(cw-dw)/2,dy=(ch-dh)/2;
-  ctx.drawImage(img,dx,dy,dw,dh);
+function drawBackground(){ // cover
+  const iw=bgImg.width, ih=bgImg.height, cw=base.width, ch=base.height;
+  const r=Math.max(cw/iw, ch/ih), dw=iw*r, dh=ih*r, dx=(cw-dw)/2, dy=(ch-dh)/2;
+  bctx.drawImage(bgImg, dx, dy, dw, dh);
 }
-function drawDot(x,y,color,r){
+function drawDot(ctx,x,y,color,r){
   const p=worldToScreen(x,y);
   ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
-  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000055";ctx.stroke();
+  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000066";ctx.stroke();
 }
-function draw(){
-  ctx.clearRect(0,0,cv.width,cv.height);
-  if(img.complete)drawBackground();
-  drawGrid();
-  drawDot(last.tgt.x,last.tgt.y,"#ffd34d",5);
-  drawDot(last.pos.x,last.pos.y,"#4aa3ff",6);
+function clamp01(v){return Math.max(0, Math.min(1, v));}
+
+/** ----- COLOR MAPS ----- **/
+// Moisture: dry→wet (orange -> pale -> light blue -> deep blue)
+function colormapMoisture(t){
+  t = clamp01(t);
+  if (t < 0.5) { // orange (low) to pale
+    const k = t/0.5;
+    return `rgba(${Math.round(255)},${Math.round(140+60*k)},${Math.round(0+80*k)},1)`;
+  } else {       // pale to deep blue
+    const k = (t-0.5)/0.5;
+    return `rgba(${Math.round(200-200*k)},${Math.round(220-140*k)},${Math.round(240+15*k)},1)`;
+  }
 }
-async function load(){
+// pH scale: red (acid) → orange → yellow → green → blue → purple (alkaline)
+function colormapPh(t){
+  t = clamp01(t);
+  const stops = [
+    [255,  0,  0], // red
+    [255,165,  0], // orange
+    [255,255,  0], // yellow
+    [  0,200, 80], // green
+    [ 30,144,255], // dodger blue
+    [128,  0,128], // purple
+  ];
+  const seg = (stops.length-1)*t;
+  const i = Math.floor(seg), k = seg - i;
+  const a = stops[i], b = stops[Math.min(i+1, stops.length-1)];
+  const r = Math.round(a[0] + (b[0]-a[0])*k);
+  const g = Math.round(a[1] + (b[1]-a[1])*k);
+  const bl= Math.round(a[2] + (b[2]-a[2])*k);
+  return `rgba(${r},${g},${bl},1)`;
+}
+// Nutrients: poor→rich (brown -> yellow-green -> green)
+function colormapNutrients(t){
+  t = clamp01(t);
+  const a=[120,72,28], m=[200,180,60], b=[34,197,94];
+  const r=Math.round(a[0]+(m[0]-a[0])*Math.min(t*2,1) + (b[0]-m[0])*Math.max(t*2-1,0));
+  const g=Math.round(a[1]+(m[1]-a[1])*Math.min(t*2,1) + (b[1]-m[1])*Math.max(t*2-1,0));
+  const bl=Math.round(a[2]+(m[2]-a[2])*Math.min(t*2,1) + (b[2]-m[2])*Math.max(t*2-1,0));
+  return `rgba(${r},${g},${bl},1)`;
+}
+
+/** ----- HEATMAP RENDER (IDW + Gaussian) ----- **/
+function drawHeatmaps(){
+  const showMoist = document.getElementById('chk-moist').checked;
+  const showPh    = document.getElementById('chk-ph').checked;
+  const showNutr  = document.getElementById('chk-nutr').checked;
+  const radius    = +document.getElementById('radius').value; // px influence radius
+  const res       = +document.getElementById('res').value;    // grid resolution
+  const alphaPct  = +document.getElementById('alpha').value;  // global alpha %
+
+  // clear overlay
+  octx.clearRect(0,0,over.width,over.height);
+
+  if (soilSamples.length === 0 || (!showMoist && !showPh && !showNutr)) return;
+
+  // Build a small offscreen buffer to compute at 'res' then scale for speed
+  const off = document.createElement('canvas');
+  off.width = res; off.height = res;
+  const ox = off.getContext('2d');
+  const imgData = ox.createImageData(res, res);
+  const data = imgData.data;
+
+  // Preconvert samples to screen coords + normalize values
+  const S = soilSamples.map(s => ({
+    sx: worldToScreen(s.x, s.y).x,
+    sy: worldToScreen(s.x, s.y).y,
+    moisture: s.moisture, ph: s.ph, nutrients: s.nutrients
+  }));
+
+  // Value normalizers: if ranges unknown, auto-scale from sample min/max
+  const valNorm = (arr,key) => {
+    const vals = arr.map(s=>s[key]).filter(v=>Number.isFinite(v));
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const span = (max-min) || 1;
+    return v => (v-min)/span;
+  };
+  const nMoist = valNorm(S,'moisture');
+  const nPh    = v => clamp01((v-3) / (10.5-3)); // typical soil pH range mapping
+  const nNutr  = valNorm(S,'nutrients');
+
+  // IDW + Gaussian (weight = 1/d^p * exp(-(d^2)/(2*sigma^2)))
+  const p = 2.0;              // IDW power
+  const sigma = radius*0.6;   // Gaussian sigma
+  const inv2s2 = 1/(2*sigma*sigma);
+
+  for (let j=0;j<res;j++){
+    for (let i=0;i<res;i++){
+      // map grid (i,j) to screen pixels
+      const gx = (i + 0.5) * (base.width / res);
+      const gy = (j + 0.5) * (base.height/ res);
+
+      let wsum=0, vm=0, vp=0, vn=0;
+
+      for (const s of S){
+        const dx = gx - s.sx, dy = gy - s.sy;
+        const d2 = dx*dx + dy*dy;
+        const d = Math.sqrt(d2) + 1e-6;
+        const w = Math.pow(1/d, p) * Math.exp(-d2*inv2s2);
+        wsum += w;
+        vm += w * nMoist(s.moisture);
+        vp += w * nPh(s.ph);
+        vn += w * nNutr(s.nutrients);
+      }
+
+      let r=0,g=0,b=0,a=0;
+      if (wsum > 0){
+        const tm = clamp01(vm/wsum), tp = clamp01(vp/wsum), tn = clamp01(vn/wsum);
+
+        // Combine selected overlays additively with soft max
+        const cols = [];
+        if (showMoist) cols.push(colormapMoisture(tm));
+        if (showPh)    cols.push(colormapPh(tp));
+        if (showNutr)  cols.push(colormapNutrients(tn));
+
+        if (cols.length){
+          // simple blend: average RGB
+          let R=0,G=0,B=0;
+          for (const c of cols){
+            const m = c.match(/rgba\((\d+),(\d+),(\d+),1\)/);
+            R += +m[1]; G += +m[2]; B += +m[3];
+          }
+          R=Math.round(R/cols.length); G=Math.round(G/cols.length); B=Math.round(B/cols.length);
+          r=R; g=G; b=B; a=255; // per-pixel alpha handled later by globalAlpha
+        }
+      }
+      const idx = (j*res + i)*4;
+      data[idx+0]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=a;
+    }
+  }
+
+  ox.putImageData(imgData,0,0);
+
+  // paint scaled to overlay canvas with transparency
+  octx.save();
+  octx.globalAlpha = alphaPct/100;
+  octx.imageSmoothingEnabled = true;
+  octx.drawImage(off, 0,0, over.width, over.height);
+  octx.restore();
+}
+
+/** ----- DRAW ALL ----- **/
+function drawAll(){
+  // base: bg + grid + target/robot
+  bctx.clearRect(0,0,base.width,base.height);
+  if (bgImg.complete) drawBackground();
+  drawGrid(bctx);
+  // target behind robot
+  const tp=statusData.target_position, cp=statusData.current_position;
+  drawDot(bctx, tp.x, tp.y, "#ffd34d", 5);
+  drawDot(bctx, cp.x, cp.y, "#4aa3ff", 6);
+
+  // overlays
+  drawHeatmaps();
+}
+
+/** ----- FETCHERS ----- **/
+async function fetchStatus(){
   try{
-    const r=await fetch("/api/status",{cache:"no-store"}), j=await r.json();
-    last.name=j.name; last.state=j.current_state; last.battery=+j.battery;
-    last.emergency=!!j.emergency;
-    last.pos=j.current_position; last.tgt=j.target_position;
-    updateUI();
-    draw();
-  }catch(e){console.error(e);}
+    const r=await fetch("/api/status",{cache:"no-store"}); const j=await r.json();
+    statusData=j;
+    // UI bits
+    document.getElementById("name").textContent=j.name;
+    document.getElementById("state").textContent=j.current_state;
+    const dot=document.querySelector(".dot");
+    dot.className=/ERROR|FAULT/i.test(j.current_state)?'dot err':(/IDLE/i.test(j.current_state)?'dot idle':'dot active');
+    document.getElementById("battery-bar").style.width=Math.min(Math.max(+j.battery,0),100)+"%";
+    document.getElementById("battery-text").textContent=j.battery+"%";
+    document.getElementById("emergency").textContent=j.emergency?'YES':'No';
+    document.getElementById("cur-x").textContent=j.current_position.x.toFixed(2);
+    document.getElementById("cur-y").textContent=j.current_position.y.toFixed(2);
+    document.getElementById("cur-z").textContent=j.current_position.z.toFixed(2);
+    document.getElementById("tgt-x").textContent=j.target_position.x.toFixed(2);
+    document.getElementById("tgt-y").textContent=j.target_position.y.toFixed(2);
+    document.getElementById("tgt-z").textContent=j.target_position.z.toFixed(2);
+    document.getElementById("updated").textContent=new Date().toLocaleTimeString();
+    drawAll();
+  }catch(e){ /* ignore */ }
 }
-function updateUI(){
-  document.getElementById("name").textContent=last.name;
-  document.getElementById("state").textContent=last.state;
-  const dot=document.querySelector(".dot");
-  dot.className="dot idle";
-  if(/ERROR|FAULT/i.test(last.state))dot.className="dot err";
-  else if(/IDLE/i.test(last.state))dot.className="dot idle";
-  else dot.className="dot active";
-  document.getElementById("battery-bar").style.width=Math.min(Math.max(last.battery,0),100)+"%";
-  document.getElementById("battery-text").textContent=last.battery+"%";
-  document.getElementById("emergency").textContent=last.emergency?"YES":"No";
-  document.getElementById("cur-x").textContent=last.pos.x.toFixed(2);
-  document.getElementById("cur-y").textContent=last.pos.y.toFixed(2);
-  document.getElementById("cur-z").textContent=last.pos.z.toFixed(2);
-  document.getElementById("tgt-x").textContent=last.tgt.x.toFixed(2);
-  document.getElementById("tgt-y").textContent=last.tgt.y.toFixed(2);
-  document.getElementById("tgt-z").textContent=last.tgt.z.toFixed(2);
-  document.getElementById("updated").textContent=new Date().toLocaleTimeString();
+
+async function fetchSoil(){
+  try{
+    const r=await fetch("/api/soil",{cache:"no-store"}); const j=await r.json();
+    // Expect: { samples: [{x,y,moisture,ph,nutrients}, ...] }
+    soilSamples = Array.isArray(j.samples) ? j.samples : [];
+    drawAll();
+  }catch(e){ /* ignore */ }
 }
-function resize(){const w=cv.clientWidth;cv.width=w;cv.height=w;draw();}
-window.addEventListener("resize",resize);
-resize(); load(); setInterval(load,1000);
+
+/** ----- RESIZE ----- **/
+function resize(){
+  const w = base.clientWidth || base.parentElement.clientWidth || 900;
+  base.width=w; base.height=w; over.width=w; over.height=w; drawAll();
+}
+window.addEventListener('resize', resize);
+
+/** ----- HOOKS ----- **/
+['chk-moist','chk-ph','chk-nutr','radius','res','alpha'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', drawAll);
+});
+
+resize();
+fetchStatus(); fetchSoil();
+setInterval(fetchStatus, 1000);
+setInterval(fetchSoil,   1500);
 </script>
 </body>
 </html>
