@@ -14,10 +14,10 @@ Robot::RobotUplink::~RobotUplink()
 
 void Robot::RobotUplink::goalCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 {
-    std::vector<geometry_msgs::msg::Point> goals;
-    for (const auto& pose : msg->poses) {
-        goals.push_back(pose.position);
-    }
+    geometry_msgs::msg::PoseArray goals = msg.poses;
+    // for (const auto& pose : msg->poses) {
+    //     goals.push_back(pose.position);
+    // }
     controller_->setGoals(goals);
     RCLCPP_INFO(this->get_logger(), "Received %zu goals for robot '%s'.", goals.size(), serial_id_.c_str());
     controller_->autoNavigate();
