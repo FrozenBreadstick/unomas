@@ -19,13 +19,13 @@
         </visual>
 
         <collision name="base_link_collision">
-            <origin xyz="0 0 0.03282" rpy="1.5708 0 0"/>
+            <origin xyz="0.0 0 0.03282" rpy="1.5708 0 0"/>
             <geometry>
                 <cylinder radius="0.122" length="0.831"/>
             </geometry>
         </collision>
         <inertial>
-            <origin xyz="0 0 0.03282" rpy="0 0 0"/>
+            <origin xyz="-0.1 0 0.03282" rpy="0 0 0"/>
             <mass value="20.0"/>
             <inertia
                 ixx="1.284"
@@ -40,6 +40,9 @@
     <!-- Wheels -->
     <xacro:wheel wheel_id="left" y_pos="0.42" x_pos="0.0"/>
     <xacro:wheel wheel_id="right" y_pos="-0.42" x_pos="0.0"/>
+    <!-- more wheels but make them invisible -->
+    <!-- <xacro:wheel wheel_id="front" y_pos="0.0" x_pos="0.32"--> -->
+    <xacro:wheel wheel_id="back" y_pos="0.0" x_pos="-0.32"/>
 
     <joint name="imu_joint" type="fixed">
         <parent link="base_link"/>

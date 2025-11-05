@@ -12,7 +12,7 @@
       <always_on>true</always_on>
       <visualize>$(arg imu_visual)</visualize>
       <update_rate>100</update_rate>
-      <topic>fella/imu</topic>
+      <topic>/fella/imu</topic>
       <gz_frame_id>imu_link</gz_frame_id>
       <imu>
         <angular_velocity>
@@ -102,7 +102,7 @@
     <plugin
       filename="ignition-gazebo-joint-state-publisher-system"
       name="ignition::gazebo::systems::JointStatePublisher">
-      <topic>fella/joint_states</topic>
+      <topic>/joint_states</topic>
     </plugin>
   </gazebo>
 
@@ -119,7 +119,7 @@
     <sensor type="gpu_lidar" name="lidar">
       <pose relative_to='base_scan'>0 0 0.2 0 0 0</pose>
       <visualize>$(arg laser_visual)</visualize>
-      <topic>fella/scan</topic>
+      <topic>/fella/scan</topic>
       <update_rate>3</update_rate>
       <gz_frame_id>base_scan</gz_frame_id>
       <ray>
@@ -151,7 +151,7 @@
     <sensor type="gpu_lidar" name="secondary_lidar">
       <pose relative_to='secondary_base_scan'>0 0 0 0 0 0</pose>
       <visualize>$(arg secondary_laser_visual)</visualize>
-      <topic>fella/secondary_scan</topic>
+      <topic>/fella/secondary_scan</topic>
       <update_rate>3</update_rate>
       <gz_frame_id>base_scan</gz_frame_id>
       <ray>
@@ -207,7 +207,7 @@
       <always_on>1</always_on>
       <update_rate>3</update_rate> <!--10-->
       <visualize>$(arg camera_visual)</visualize>
-      <topic>fella/camera</topic>
+      <topic>/fella/camera</topic>
       <gz_frame_id>camera_link</gz_frame_id>
     </sensor>
   </gazebo>
