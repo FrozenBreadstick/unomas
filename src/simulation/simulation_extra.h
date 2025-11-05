@@ -14,7 +14,7 @@ namespace Simulation {
     class SimulationExtra : public rclcpp::Node
     {
         public:
-            SimulationExtra(int size, double resolution);
+            SimulationExtra(int size);
             ~SimulationExtra();
 
         private:
@@ -26,7 +26,6 @@ namespace Simulation {
             rclcpp::Service<unomas::srv::QuerySoil>::SharedPtr soil_query_service_;
 
             int size_;
-            double resolution_;
             grid_map::GridMap soil_map_;
     };
 }

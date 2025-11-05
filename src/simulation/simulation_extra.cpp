@@ -1,10 +1,10 @@
 #include "simulation_extra.h"
 
-Simulation::SimulationExtra::SimulationExtra(int size, double resolution)
-    : Node("simulation_extras_node"), size_(size), resolution_(resolution)
+Simulation::SimulationExtra::SimulationExtra(int size)
+    : Node("simulation_extras_node"), size_(size)
 {
     soil_map_.setFrameId("map");
-    soil_map_.setGeometry(grid_map::Length(size_ * resolution_, size_ * resolution_), resolution_);
+    soil_map_.setGeometry(grid_map::Length(size_, size_), 1);
     soil_map_.add("moisture");
     soil_map_.add("ph");
     soil_map_.add("nutrients");
