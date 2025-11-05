@@ -8,13 +8,10 @@ int main(int argc, char* argv[])
     auto params = std::make_shared<rclcpp::Node>("params_simulation");
 
     params->declare_parameter<int>("size");
-    params->declare_parameter<double>("resolution");
     int size;
-    double resolution;
     params->get_parameter("size", size);
-    params->get_parameter("resolution", resolution);
 
-    auto simulator = std::make_shared<Simulation::SimulationExtra>(size, resolution);
+    auto simulator = std::make_shared<Simulation::SimulationExtra>(size);
 
     rclcpp::spin(simulator);
 

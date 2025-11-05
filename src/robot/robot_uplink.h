@@ -22,6 +22,8 @@ namespace Robot {
             RobotUplink(std::string serial_id);
             ~RobotUplink();
 
+            void initialise();
+
         private:
             std::shared_ptr<Robot::RobotController> controller_;
             

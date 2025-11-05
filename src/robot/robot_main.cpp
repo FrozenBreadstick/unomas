@@ -14,6 +14,8 @@ int main(int argc, char* argv[])
 
     auto robot = std::make_shared<Robot::RobotUplink>(serial_id);
 
+    robot->initialise();
+
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(robot);   
     executor.spin();

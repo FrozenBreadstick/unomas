@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>UNO MAS · Robot Dashboard</title>
+<title>UNO MAS · Soil Heatmap</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root{
@@ -21,7 +21,6 @@
     }
     header{padding:20px 24px; border-bottom:1px solid var(--border); background:#0c111b88; backdrop-filter: blur(6px);}
     header h1{margin:0; font-size:18px; font-weight:600; letter-spacing:.2px}
-    header h1 span{opacity:.8; font-weight:400}
     main{max-width:980px; width:100%; margin:28px auto; padding:0 16px; flex:1}
     .grid{display:grid; gap:16px; grid-template-columns:1.2fr .8fr}
     @media (max-width:860px){.grid{grid-template-columns:1fr}}
@@ -62,9 +61,61 @@
     .code{background:#0e1420; border:1px dashed #22304a; color:#cfe1ff; padding:10px 12px; border-radius:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; overflow:auto}
     footer{padding:18px 24px; border-top:1px solid var(--border); color:var(--muted)}
     .right{margin-left:auto}
-  /* Right map */
-  #map-area{flex:1; min-width: 700px;}
-  canvas{max-width:100%;height:auto;border-left:1px solid var(--border);background:#0e1420;}
+    /* Controls under status */
+    #controls{
+      margin-top:16px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#101728;
+      display:grid;
+      gap:12px;
+    }
+    #controls .toggle-row,
+    #controls .slider-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+    }
+    #controls label{display:flex; align-items:center; gap:8px; font-size:13px}
+    #controls input[type="checkbox"]{transform:scale(1.1)}
+    #controls input[type="range"]{width:120px}
+    #controls small{display:block; font-size:12px; color:var(--muted)}
+  /* Map */
+  #map-area{
+    flex:1;
+    min-width: 700px;
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+  #map-wrapper{
+    position:relative;
+    width:100%;
+    border-radius:14px;
+    overflow:hidden;
+    background:#0e1420;
+  }
+  canvas{width:100%;height:auto;display:block;}
+  #baseCanvas{background:#0e1420;border-left:1px solid var(--border);}
+  #overlayCanvas{position:absolute; inset:0; pointer-events:none; background:transparent;}
+  #legend{
+    position:absolute;
+    left:20px;
+    bottom:20px;
+    background:#0c111bcc;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px 10px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  @media (max-width:860px){
+    #map-area{min-width:0}
+  }
 </style>
 </head>
 <body>
@@ -119,81 +170,292 @@
             <div class="value" id="tgt-z">—</div>
           </div>
         </div>
+
+        <div class="section-title">Heatmap Controls</div>
+        <div id="controls">
+          <div class="toggle-row">
+            <label><input id="chk-moist" type="checkbox" checked> Moisture</label>
+            <label><input id="chk-ph"    type="checkbox"> pH</label>
+            <label><input id="chk-nutr"  type="checkbox"> Nutrients</label>
+          </div>
+          <div class="slider-row">
+            <label>Smooth <input id="radius" type="range" min="8" max="45" value="22"></label>
+            <label>Resolution <input id="res" type="range" min="80" max="300" value="180"></label>
+            <label>Opacity <input id="alpha" type="range" min="20" max="100" value="65"></label>
+          </div>
+          <small>Toggle layers and adjust smoothing, grid resolution, and overlay opacity for the soil heatmap.</small>
+        </div>
       </section>
 
   <!-- MAP PANEL -->
   <section id="map-area">
-    <canvas id="cv" width="800" height="800"></canvas>
+    <div id="map-wrapper">
+      <canvas id="baseCanvas" width="800" height="800"></canvas>
+      <canvas id="overlayCanvas" width="800" height="800"></canvas>
+      <div id="legend">Moisture (orange→blue), pH (red→purple), Nutrients (brown→green)</div>
+    </div>
   </section>
 </main>
 
 <script>
 const WORLD_SIZE=135, HALF=WORLD_SIZE/2;
 const IMG_URL="/static/EnvTopView.png";
-const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
-const img=new Image(); img.src=IMG_URL; img.onload=draw;
-let last={name:"—",state:"IDLE",battery:0,emergency:false,pos:{x:0,y:0},tgt:{x:0,y:0}};
+const base=document.getElementById("baseCanvas");
+const over=document.getElementById("overlayCanvas");
+const bctx=base.getContext("2d");
+const octx=over.getContext("2d");
+const bgImg=new Image(); bgImg.src=IMG_URL; bgImg.onload=drawAll;
 
-// helpers
-function worldToScreen(x,y){const s=cv.width/WORLD_SIZE;return{x:cv.width/2+x*s,y:cv.height/2-y*s};}
-function drawGrid(){
-  const s=cv.width/WORLD_SIZE; ctx.lineWidth=1;
+let statusData={
+  name:"—",
+  current_state:"IDLE",
+  battery:0,
+  emergency:false,
+  current_position:{x:0,y:0,z:0},
+  target_position:{x:0,y:0,z:0}
+};
+
+let soilSamples=[];
+
+function clamp01(v){return Math.max(0,Math.min(1,v));}
+function worldToScreen(x,y){const s=base.width/WORLD_SIZE;return{x:base.width/2+x*s,y:base.height/2-y*s};}
+function drawGrid(ctx){
+  const s=base.width/WORLD_SIZE;
+  ctx.lineWidth=1;
   for(let u=Math.ceil(-HALF);u<=Math.floor(HALF);u++){
     const vx=worldToScreen(u,0).x, hy=worldToScreen(0,u).y;
     ctx.strokeStyle=(u===0)?"#ef4444":(u%10===0?"#4aa3ff":u%5===0?"#52a2ff55":"#ffffff10");
-    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,cv.height);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(cv.width,hy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(vx,0);ctx.lineTo(vx,base.height);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,hy);ctx.lineTo(base.width,hy);ctx.stroke();
   }
 }
 function drawBackground(){
-  const iw=img.width,ih=img.height,cw=cv.width,ch=cv.height;
-  const r=Math.max(cw/iw,ch/ih);const dw=iw*r,dh=ih*r;const dx=(cw-dw)/2,dy=(ch-dh)/2;
-  ctx.drawImage(img,dx,dy,dw,dh);
+  if(!bgImg.complete) return;
+  const iw=bgImg.width,ih=bgImg.height,cw=base.width,ch=base.height;
+  const r=Math.max(cw/iw,ch/ih);
+  const dw=iw*r, dh=ih*r;
+  const dx=(cw-dw)/2, dy=(ch-dh)/2;
+  bctx.drawImage(bgImg,dx,dy,dw,dh);
 }
-function drawDot(x,y,color,r){
+function drawDot(ctx,x,y,color,r){
   const p=worldToScreen(x,y);
   ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
-  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000055";ctx.stroke();
+  ctx.fillStyle=color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#00000066";ctx.stroke();
 }
-function draw(){
-  ctx.clearRect(0,0,cv.width,cv.height);
-  if(img.complete)drawBackground();
-  drawGrid();
-  drawDot(last.tgt.x,last.tgt.y,"#ffd34d",5);
-  drawDot(last.pos.x,last.pos.y,"#4aa3ff",6);
+
+function colormapMoisture(t){
+  t = clamp01(t);
+  if (t < 0.5) {
+    const k = t/0.5;
+    return `rgba(${Math.round(255)},${Math.round(140+60*k)},${Math.round(0+80*k)},1)`;
+  } else {
+    const k = (t-0.5)/0.5;
+    return `rgba(${Math.round(200-200*k)},${Math.round(220-140*k)},${Math.round(240+15*k)},1)`;
+  }
 }
-async function load(){
-  try{
-    const r=await fetch("/api/status",{cache:"no-store"}), j=await r.json();
-    last.name=j.name; last.state=j.current_state; last.battery=+j.battery;
-    last.emergency=!!j.emergency;
-    last.pos=j.current_position; last.tgt=j.target_position;
-    updateUI();
-    draw();
-  }catch(e){console.error(e);}
+function colormapPh(t){
+  t = clamp01(t);
+  const stops = [
+    [255,  0,  0],
+    [255,165,  0],
+    [255,255,  0],
+    [  0,200, 80],
+    [ 30,144,255],
+    [128,  0,128],
+  ];
+  const seg = (stops.length-1)*t;
+  const i = Math.floor(seg), k = seg - i;
+  const a = stops[i], b = stops[Math.min(i+1, stops.length-1)];
+  const r = Math.round(a[0] + (b[0]-a[0])*k);
+  const g = Math.round(a[1] + (b[1]-a[1])*k);
+  const bl= Math.round(a[2] + (b[2]-a[2])*k);
+  return `rgba(${r},${g},${bl},1)`;
 }
-function updateUI(){
-  document.getElementById("name").textContent=last.name;
-  document.getElementById("state").textContent=last.state;
-  const dot=document.querySelector(".dot");
-  dot.className="dot idle";
-  if(/ERROR|FAULT/i.test(last.state))dot.className="dot err";
-  else if(/IDLE/i.test(last.state))dot.className="dot idle";
-  else dot.className="dot active";
-  document.getElementById("battery-bar").style.width=Math.min(Math.max(last.battery,0),100)+"%";
-  document.getElementById("battery-text").textContent=last.battery+"%";
-  document.getElementById("emergency").textContent=last.emergency?"YES":"No";
-  document.getElementById("cur-x").textContent=last.pos.x.toFixed(2);
-  document.getElementById("cur-y").textContent=last.pos.y.toFixed(2);
-  document.getElementById("cur-z").textContent=last.pos.z.toFixed(2);
-  document.getElementById("tgt-x").textContent=last.tgt.x.toFixed(2);
-  document.getElementById("tgt-y").textContent=last.tgt.y.toFixed(2);
-  document.getElementById("tgt-z").textContent=last.tgt.z.toFixed(2);
+function colormapNutrients(t){
+  t = clamp01(t);
+  const a=[120,72,28], m=[200,180,60], b=[34,197,94];
+  const r=Math.round(a[0]+(m[0]-a[0])*Math.min(t*2,1) + (b[0]-m[0])*Math.max(t*2-1,0));
+  const g=Math.round(a[1]+(m[1]-a[1])*Math.min(t*2,1) + (b[1]-m[1])*Math.max(t*2-1,0));
+  const bl=Math.round(a[2]+(m[2]-a[2])*Math.min(t*2,1) + (b[2]-m[2])*Math.max(t*2-1,0));
+  return `rgba(${r},${g},${bl},1)`;
+}
+
+function drawHeatmaps(){
+  const showMoist=document.getElementById("chk-moist").checked;
+  const showPh=document.getElementById("chk-ph").checked;
+  const showNutr=document.getElementById("chk-nutr").checked;
+  const radius=+document.getElementById("radius").value;
+  const res=+document.getElementById("res").value;
+  const alphaPct=+document.getElementById("alpha").value;
+
+  octx.clearRect(0,0,over.width,over.height);
+  if(soilSamples.length===0 || (!showMoist && !showPh && !showNutr)) return;
+
+  const off=document.createElement("canvas");
+  off.width=res; off.height=res;
+  const ox=off.getContext("2d");
+  const imgData=ox.createImageData(res,res);
+  const data=imgData.data;
+
+  const S=soilSamples.map(s=>({
+    sx:worldToScreen(s.x,s.y).x,
+    sy:worldToScreen(s.x,s.y).y,
+    moisture:s.moisture,
+    ph:s.ph,
+    nutrients:s.nutrients
+  }));
+
+  const valNorm=(arr,key)=>{
+    const vals=arr.map(s=>s[key]).filter(v=>Number.isFinite(v));
+    if(!vals.length) return ()=>0;
+    const min=Math.min(...vals), max=Math.max(...vals);
+    const span=(max-min)||1;
+    return v=>(v-min)/span;
+  };
+  const nMoist=valNorm(S,"moisture");
+  const nPh=v=>clamp01((v-3)/(10.5-3));
+  const nNutr=valNorm(S,"nutrients");
+
+  const power=2;
+  const sigma=radius*0.6;
+  const inv2s2=1/(2*sigma*sigma || 1);
+
+  for(let j=0;j<res;j++){
+    for(let i=0;i<res;i++){
+      const gx=(i+0.5)*(base.width/res);
+      const gy=(j+0.5)*(base.height/res);
+
+      let wsum=0, vm=0, vp=0, vn=0;
+
+      for(const s of S){
+        const dx=gx-s.sx, dy=gy-s.sy;
+        const d2=dx*dx+dy*dy;
+        const d=Math.sqrt(d2)+1e-6;
+        const w=Math.pow(1/d,power)*Math.exp(-d2*inv2s2);
+        wsum+=w;
+        vm+=w*nMoist(s.moisture);
+        vp+=w*nPh(s.ph);
+        vn+=w*nNutr(s.nutrients);
+      }
+
+      let r=0,g=0,b=0,a=0;
+      if(wsum>0){
+        const tm=clamp01(vm/wsum);
+        const tp=clamp01(vp/wsum);
+        const tn=clamp01(vn/wsum);
+
+        const cols=[];
+        if(showMoist) cols.push(colormapMoisture(tm));
+        if(showPh) cols.push(colormapPh(tp));
+        if(showNutr) cols.push(colormapNutrients(tn));
+
+        if(cols.length){
+          let R=0,G=0,B=0;
+          for(const c of cols){
+            const m=c.match(/rgba\((\d+),(\d+),(\d+),1\)/);
+            if(!m) continue;
+            R+=+m[1]; G+=+m[2]; B+=+m[3];
+          }
+          R=Math.round(R/cols.length);
+          G=Math.round(G/cols.length);
+          B=Math.round(B/cols.length);
+          r=R; g=G; b=B; a=255;
+        }
+      }
+
+      const idx=(j*res+i)*4;
+      data[idx]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=a;
+    }
+  }
+
+  ox.putImageData(imgData,0,0);
+  octx.save();
+  octx.globalAlpha=alphaPct/100;
+  octx.imageSmoothingEnabled=true;
+  octx.drawImage(off,0,0,over.width,over.height);
+  octx.restore();
+}
+
+function drawAll(){
+  bctx.clearRect(0,0,base.width,base.height);
+  drawBackground();
+  drawHeatmaps();
+  drawGrid(octx);
+  const tp=statusData.target_position||{};
+  const cp=statusData.current_position||{};
+  const tx=Number.isFinite(tp.x)?tp.x:0;
+  const ty=Number.isFinite(tp.y)?tp.y:0;
+  const cx=Number.isFinite(cp.x)?cp.x:0;
+  const cy=Number.isFinite(cp.y)?cp.y:0;
+  drawDot(octx,tx,ty,"#ffd34d",5);
+  drawDot(octx,cx,cy,"#4aa3ff",6);
+}
+
+function updateStatusUI(){
+  document.getElementById("name").textContent=statusData.name??"—";
+  document.getElementById("state").textContent=statusData.current_state??"—";
+  const dot=document.querySelector("#state-badge .dot");
+  if(dot){
+    dot.className=/ERROR|FAULT/i.test(statusData.current_state)? "dot err" :
+                 (/IDLE/i.test(statusData.current_state)? "dot idle" : "dot active");
+  }
+  const battery=Math.min(Math.max(+statusData.battery||0,0),100);
+  document.getElementById("battery-bar").style.width=battery+"%";
+  document.getElementById("battery-text").textContent=`${battery}%`;
+  document.getElementById("emergency").textContent=statusData.emergency?"YES":"No";
+  const curr=statusData.current_position||{x:0,y:0,z:0};
+  const tgt=statusData.target_position||{x:0,y:0,z:0};
+  const fmt=v=>Number.isFinite(v)?v.toFixed(2):"—";
+  document.getElementById("cur-x").textContent=fmt(curr.x);
+  document.getElementById("cur-y").textContent=fmt(curr.y);
+  document.getElementById("cur-z").textContent=fmt(curr.z);
+  document.getElementById("tgt-x").textContent=fmt(tgt.x);
+  document.getElementById("tgt-y").textContent=fmt(tgt.y);
+  document.getElementById("tgt-z").textContent=fmt(tgt.z);
   document.getElementById("updated").textContent=new Date().toLocaleTimeString();
 }
-function resize(){const w=cv.clientWidth;cv.width=w;cv.height=w;draw();}
+
+async function fetchStatus(){
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"});
+    const j=await r.json();
+    statusData=j;
+    updateStatusUI();
+    drawAll();
+  }catch(e){console.error(e);}
+}
+
+async function fetchSoil(){
+  try{
+    const r=await fetch("/api/soil",{cache:"no-store"});
+    const j=await r.json();
+    soilSamples=Array.isArray(j?.samples)? j.samples : (Array.isArray(j)? j : []);
+    drawAll();
+  }catch(e){console.error(e);}
+}
+
+function resize(){
+  const wrapper=document.getElementById("map-wrapper");
+  const w=wrapper.clientWidth||base.clientWidth||800;
+  base.width=w;
+  base.height=w;
+  over.width=w;
+  over.height=w;
+  drawAll();
+}
 window.addEventListener("resize",resize);
-resize(); load(); setInterval(load,1000);
+
+["chk-moist","chk-ph","chk-nutr","radius","res","alpha"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("input",drawAll);
+});
+
+resize();
+updateStatusUI();
+fetchStatus();
+fetchSoil();
+setInterval(fetchStatus,1000);
+setInterval(fetchSoil,1500);
 </script>
 </body>
 </html>

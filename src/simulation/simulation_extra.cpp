@@ -1,10 +1,10 @@
 #include "simulation_extra.h"
 
-Simulation::SimulationExtra::SimulationExtra(int size, double resolution)
-    : Node("simulation_extras_node"), size_(size), resolution_(resolution)
+Simulation::SimulationExtra::SimulationExtra(int size)
+    : Node("simulation_extras_node"), size_(size)
 {
     soil_map_.setFrameId("map");
-    soil_map_.setGeometry(grid_map::Length(size_ * resolution_, size_ * resolution_), resolution_);
+    soil_map_.setGeometry(grid_map::Length(size_, size_), 1);
     soil_map_.add("moisture");
     soil_map_.add("ph");
     soil_map_.add("nutrients");
@@ -14,6 +14,12 @@ Simulation::SimulationExtra::SimulationExtra(int size, double resolution)
     soil_query_service_ = this->create_service<unomas::srv::QuerySoil>(
         "query_soil",
         std::bind(&SimulationExtra::soilQueryServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+    soil_debug_service_ = this->create_service<unomas::srv::QuerySoil>(
+        "query_soil",
+        std::bind(&SimulationExtra::soilDebugServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+    soil_debug_publisher_ = this->create_publisher<unomas::msg::SoilInfo>("unomas/SoilUpdatePacket", 10);
 }
 
 Simulation::SimulationExtra::~SimulationExtra()
@@ -56,4 +62,32 @@ void Simulation::SimulationExtra::soilQueryServiceCallback(
         response->moisture = response->ph = response->nutrients = NAN;
         RCLCPP_WARN(this->get_logger(), "Query position (%.2f, %.2f) is outside the soil map!", x, y);
     }
+}
+
+void Simulation::SimulationExtra::soilDebugServiceCallback(
+    const std::shared_ptr<unomas::srv::QuerySoil::Request> request,
+    std::shared_ptr<unomas::srv::QuerySoil::Response> response)
+{
+    double x = request->x;
+    double y = request->y;
+
+    unomas::msg::SoilInfo debugInfo;
+    debugInfo.x = x;
+    debugInfo.y = y;
+
+    grid_map::Position pos(x, y);
+
+    if (soil_map_.isInside(pos)) {
+        response->moisture = soil_map_.atPosition("moisture", pos);
+        response->ph       = soil_map_.atPosition("ph", pos);
+        response->nutrients= soil_map_.atPosition("nutrients", pos);
+    } else {
+        response->moisture = response->ph = response->nutrients = NAN;
+        RCLCPP_WARN(this->get_logger(), "Query position (%.2f, %.2f) is outside the soil map!", x, y);
+    }
+
+    debugInfo.moisture = response->moisture;
+    debugInfo.ph = response->ph;
+    debugInfo.nutrients = response->nutrients;
+    soil_debug_publisher_->publish(debugInfo);
 }
