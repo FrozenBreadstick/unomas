@@ -46,7 +46,6 @@ namespace UI
             std::vector<unomas::msg::SoilInfo> soil_data_;
             std::mutex soil_data_lock_;
 
-<<<<<<< HEAD
             void macroPlanServiceCallback(
                 const std::shared_ptr<unomas::srv::UpdateMacroPlan::Request> request,
                 std::shared_ptr<unomas::srv::UpdateMacroPlan::Response> response);
@@ -55,12 +54,11 @@ namespace UI
             std::mutex macro_plan_lock_;
 
             rclcpp::Publisher<unomas::msg::MacroPlan>::SharedPtr ensurePlanPublisher(const std::string& topic);
-=======
+
             void debugPoseServiceCallback(const std::shared_ptr<unomas::srv::DummyTrigger::Request> request,
             std::shared_ptr<unomas::srv::DummyTrigger::Response> response);
             rclcpp::Service<unomas::srv::DummyTrigger>::SharedPtr debug_pose_service_;
             rclcpp::Publisher<unomas::msg::AddressedPoseArray>::SharedPtr debug_pose_publisher_;
->>>>>>> refs/remotes/origin/main
     };
 }
 
