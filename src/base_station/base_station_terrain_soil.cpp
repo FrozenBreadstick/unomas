@@ -18,10 +18,9 @@ BaseStation::BaseStationTerrainSoil::BaseStationTerrainSoil(std::string station_
         std::bind(&BaseStation::BaseStationTerrainSoil::soilInfoSubCallback, this, std::placeholders::_1)
     );
 
-    terrain_soil_service_ = this->create_service<unomas::srv::TerrainSoilData>(
-        "terrain_soil_data",
-        std::bind(&BaseStation::BaseStationTerrainSoil::terrainSoilServiceCallback, this, std::placeholders::_1, std::placeholders::_2
-        )
+    soil_info_publisher_ = this->create_publisher<unomas::msg::SoilInfo>(
+        "unomas/SoilUpdatePacket",
+        10
     );
 
 }
@@ -49,18 +48,7 @@ void BaseStation::BaseStationTerrainSoil::soilInfoSubCallback(const unomas::msg:
     }
 
     soil_data_storage_.push_back(*msg);
-}
 
-void BaseStation::BaseStationTerrainSoil::terrainSoilServiceCallback(
-    const std::shared_ptr<unomas::srv::TerrainSoilData::Request> request,
-    std::shared_ptr<unomas::srv::TerrainSoilData::Response> response
-)
-{
-    std::lock_guard<std::mutex> lock(resource_lock_);
-
-    auto req = request; //Not used but so colcon doesnt give me a yellow square which makes me sad
-
-    RCLCPP_INFO(this->get_logger(), "TerrainSoilData service called. Returning %zu soil data entries.", soil_data_storage_.size());
-
-    response->soil_data = soil_data_storage_;
+    soil_info_publisher_->publish(*msg);
+    RCLCPP_INFO(this->get_logger(), "Published soil info at (%.2f, %.2f).", msg->x, msg->y);
 }
