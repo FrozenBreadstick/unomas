@@ -78,7 +78,8 @@
   #controls button:disabled{opacity:.4;cursor:not-allowed}
   .primary-button{background:var(--accent);border-color:#2c7bd4;color:#031424;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
   .primary-button:hover{background:#5bb1ff}
-  .mode-button.active{background:#203252;border-color:var(--accent)}
+  .secondary-button{background:#141b2c}
+  .secondary-button:hover{background:#1c2639}
   .button-row{display:flex;flex-wrap:wrap;gap:8px}
   .list-box{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);max-height:160px;overflow:auto}
   .list-box li{display:flex;align-items:center;gap:8px}
@@ -132,62 +133,46 @@
 
       <div class="section-title">Controls</div>
       <div id="controls">
-        <div class="toggle-row">
+        <div class="button-row">
           <label><input id="chk-moist" type="checkbox" checked> Moisture</label>
           <label><input id="chk-ph" type="checkbox"> pH</label>
           <label><input id="chk-nutr" type="checkbox"> Nutrients</label>
         </div>
-        <div class="slider-row">
+        <div class="button-row">
           <label>Smooth<br><input id="radius" type="range" min="8" max="45" value="22"></label>
           <label>Resolution<br><input id="res" type="range" min="80" max="300" value="180"></label>
           <label>Opacity<br><input id="alpha" type="range" min="20" max="100" value="65"></label>
         </div>
-        <div class="section-title">Route Planning</div>
         <label>Station Namespace<input id="station-name-input" type="text" placeholder="e.g. base_station"></label>
         <label>Robot Address<input id="robot-address-input" type="text" placeholder="robot serial / address"></label>
         <label>Route Width (m)<br><input id="route-width" type="range" min="1" max="8" value="2"></label>
+        <label><input id="visit-all" type="checkbox" checked> Visit fields in listed order</label>
         <div class="button-row">
           <button id="btn-toggle-route" class="mode-button">Start Route</button>
           <button id="btn-complete-route">Complete Route</button>
           <button id="btn-undo-point">Undo Point</button>
           <button id="btn-clear-route">Clear Active</button>
         </div>
+        <div class="button-row">
+          <button id="btn-toggle-gate" class="mode-button">Gate Mode</button>
+          <button id="btn-clear-gates">Clear Gates</button>
+        </div>
         <div>
           <strong class="muted" style="display:block;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Active Route Points</strong>
-          <ul id="active-route-list" class="list-box">
-            <li>—</li>
-          </ul>
+          <ul id="active-route-list" class="list-box"><li>—</li></ul>
         </div>
         <div>
           <strong class="muted" style="display:block;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Saved Routes</strong>
-          <ul id="routes-list" class="list-box">
-            <li>—</li>
-          </ul>
-        </div>
-        <div class="section-title">Fields</div>
-        <div class="button-row">
-          <button id="btn-toggle-field" class="mode-button">Start Field</button>
-          <button id="btn-complete-field">Complete Field</button>
-          <button id="btn-undo-field">Undo Point</button>
-          <button id="btn-clear-field">Clear Active</button>
+          <ul id="routes-list" class="list-box"><li>—</li></ul>
         </div>
         <div>
-          <strong class="muted" style="display:block;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Active Field Points</strong>
-          <ul id="active-field-list" class="list-box">
-            <li>—</li>
-          </ul>
-        </div>
-        <div>
-          <strong class="muted" style="display:block;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Fields</strong>
-          <ul id="fields-list" class="list-box">
-            <li>—</li>
-          </ul>
+          <strong class="muted" style="display:block;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Field Gates</strong>
+          <ul id="gates-list" class="list-box"><li>—</li></ul>
         </div>
         <div class="button-row">
-          <button id="btn-toggle-gate" class="mode-button">Gate Mode</button>
+          <button id="btn-confirm-plan" class="primary-button">Submit Plan</button>
+          <button id="btn-calc-shortest" class="secondary-button">Calculate Shortest</button>
         </div>
-        <label><input id="visit-all" type="checkbox" checked> Visit fields in listed order</label>
-        <button id="btn-confirm-route" class="primary-button">Confirm Plan</button>
         <div id="plan-status"></div>
       </div>
     </section>
@@ -233,16 +218,12 @@ const planning = {
   robotAddress: "",
   visitAll: true,
   drawingRoute: false,
-  drawingField: false,
   gateMode: false,
   routeWidth: 2,
   activeRoutePoints: [],
-  activeFieldPoints: [],
   routes: [],
-  fields: [],
-  nextRouteId: 1,
-  nextFieldId: 1,
-  activeGateFieldId: null
+  gates: [],
+  previewGoals: []
 };
 
 const elements = {
@@ -253,18 +234,15 @@ const elements = {
   completeRoute: document.getElementById("btn-complete-route"),
   undoPoint: document.getElementById("btn-undo-point"),
   clearRoute: document.getElementById("btn-clear-route"),
-  toggleField: document.getElementById("btn-toggle-field"),
-  completeField: document.getElementById("btn-complete-field"),
-  undoFieldPoint: document.getElementById("btn-undo-field"),
-  clearField: document.getElementById("btn-clear-field"),
   toggleGate: document.getElementById("btn-toggle-gate"),
-  confirm: document.getElementById("btn-confirm-route"),
+  clearGates: document.getElementById("btn-clear-gates"),
+  confirm: document.getElementById("btn-confirm-plan"),
+  calcShortest: document.getElementById("btn-calc-shortest"),
   visitAll: document.getElementById("visit-all"),
   planStatus: document.getElementById("plan-status"),
   activeRouteList: document.getElementById("active-route-list"),
   routesList: document.getElementById("routes-list"),
-  activeFieldList: document.getElementById("active-field-list"),
-  fieldsList: document.getElementById("fields-list")
+  gatesList: document.getElementById("gates-list")
 };
 
 function clamp01(v){return Math.max(0, Math.min(1, v));}
@@ -280,77 +258,6 @@ function distance2d(a,b){
   const dx=a.x-b.x; const dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy);
 }
 
-function polygonCentroid(points){
-  if(!points || points.length===0) return null;
-  if(points.length===1) return {x: points[0].x, y: points[0].y};
-  let area = 0;
-  let cx = 0;
-  let cy = 0;
-  for(let i=0;i<points.length;i++){
-    const j = (i+1)%points.length;
-    const cross = points[i].x*points[j].y - points[j].x*points[i].y;
-    area += cross;
-    cx += (points[i].x + points[j].x) * cross;
-    cy += (points[i].y + points[j].y) * cross;
-  }
-  if(Math.abs(area) < 1e-6){
-    const sum = points.reduce((acc,pt)=>({x:acc.x+pt.x, y:acc.y+pt.y}), {x:0,y:0});
-    return {x: sum.x/points.length, y: sum.y/points.length};
-  }
-  area *= 0.5;
-  const factor = 1/(6*area);
-  return {x: cx*factor, y: cy*factor};
-}
-
-function pointInPolygon(point, polygon){
-  if(!polygon || polygon.length < 3) return false;
-  let inside = false;
-  for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
-    const xi = polygon[i].x, yi = polygon[i].y;
-    const xj = polygon[j].x, yj = polygon[j].y;
-    const intersect = ((yi>point.y)!==(yj>point.y)) &&
-      (point.x < (xj - xi) * (point.y - yi) / (yj - yi + 1e-9) + xi);
-    if(intersect) inside = !inside;
-  }
-  return inside;
-}
-
-function fieldCentroid(outline){
-  return polygonCentroid(outline);
-}
-
-function findSnapTarget(world){
-  let best = null;
-  let bestDist = Infinity;
-
-  function consider(candidate, tolerance){
-    if(!candidate) return;
-    const dist = distance2d(world, candidate);
-    if(dist <= tolerance && dist < bestDist){
-      best = {x: candidate.x, y: candidate.y};
-      bestDist = dist;
-    }
-  }
-
-  const activeTolerance = Math.max(0.1, planning.routeWidth);
-  planning.activeRoutePoints.forEach(pt => consider(pt, activeTolerance));
-
-  const fieldTolerance = Math.max(0.1, planning.routeWidth);
-  planning.activeFieldPoints.forEach(pt => consider(pt, fieldTolerance));
-
-  planning.routes.forEach(route => {
-    const tolerance = Math.max(0.1, Math.max(route.width, planning.routeWidth));
-    route.points.forEach(pt => consider(pt, tolerance));
-  });
-
-  planning.fields.forEach(field=>{
-    const tolerance = Math.max(0.1, planning.routeWidth);
-    field.outline.forEach(pt => consider(pt, tolerance));
-  });
-
-  return best;
-}
-
 function drawGrid(ctx){
   ctx.lineWidth=1;
   for(let u=Math.ceil(-WORLD_SIZE/2);u<=Math.floor(WORLD_SIZE/2);u++){
@@ -362,6 +269,7 @@ function drawGrid(ctx){
     ctx.beginPath();ctx.moveTo(0,h);ctx.lineTo(base.width,h);ctx.stroke();
   }
 }
+
 function drawBackground(){
   if(!bgImg.complete)return;
   const iw=bgImg.width, ih=bgImg.height, cw=base.width, ch=base.height;
@@ -370,13 +278,15 @@ function drawBackground(){
   const dx=(cw-dw)/2, dy=(ch-dh)/2;
   bctx.drawImage(bgImg,dx,dy,dw,dh);
 }
+
 function drawDot(ctx,x,y,color,r=6){
   const p=worldToScreen(x,y);
   ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
   ctx.fillStyle=color;ctx.fill();
-  ctx.lineWidth=2;ctx.strokeStyle="rgba(0,0,0,.4)";ctx.stroke();
+  ctx.lineWidth=2;ctx.strokeStyle="rgba(0,0,0,0.45)";ctx.stroke();
 }
-function drawLabel(ctx,text,wx,wy,color="#e8edf4"){
+
+function drawLabel(ctx,text,wx,wy,color="#e8edf4"){ 
   const p=worldToScreen(wx,wy);
   ctx.save();
   ctx.font="12px system-ui";
@@ -508,84 +418,46 @@ function drawPlanning(){
   rctx.clearRect(0,0,routeCanvas.width,routeCanvas.height);
   const scale = base.width / WORLD_SIZE;
 
-  // saved routes
   planning.routes.forEach(route=>{
-    if(route.points.length<2) return;
-    const widthPx = Math.max(2, route.width * scale * 0.6);
-    const pts = route.points.map(pt=>worldToScreen(pt.x,pt.y));
+    if(route.points.length<2)return;
+    const pts=route.points.map(pt=>worldToScreen(pt.x,pt.y));
     rctx.save();
-    rctx.lineWidth = widthPx;
-    rctx.strokeStyle = "#38bdf8";
-    rctx.lineCap = "round";
-    rctx.lineJoin = "round";
+    rctx.lineWidth=Math.max(2,route.width*scale*0.6);
+    rctx.strokeStyle="#38bdf8";
+    rctx.lineCap="round";
+    rctx.lineJoin="round";
     rctx.beginPath();
-    rctx.moveTo(pts[0].x, pts[0].y);
-    for(let i=1;i<pts.length;i++) rctx.lineTo(pts[i].x, pts[i].y);
+    rctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++)rctx.lineTo(pts[i].x,pts[i].y);
     rctx.stroke();
     rctx.restore();
   });
 
-  // saved fields
-  planning.fields.forEach((field, idx)=>{
-    if(field.outline.length<2) return;
-    const pts = field.outline.map(pt=>worldToScreen(pt.x, pt.y));
-    rctx.save();
-    rctx.beginPath();
-    rctx.moveTo(pts[0].x, pts[0].y);
-    for(let i=1;i<pts.length;i++) rctx.lineTo(pts[i].x, pts[i].y);
-    if(field.outline.length>2){
-      rctx.closePath();
-    }
-    rctx.fillStyle = field.enabled ? "rgba(34,197,94,0.12)" : "rgba(148,163,184,0.10)";
-    rctx.strokeStyle = field.enabled ? "#22c55e" : "#64748b";
-    rctx.lineWidth = 2;
-    if(field.outline.length>2){
-      rctx.fill();
-    }
-    rctx.stroke();
-    rctx.restore();
-
-    if(field.gate){
-      drawDot(rctx, field.gate.x, field.gate.y, field.enabled ? "#22c55e" : "#64748b", 6);
-      drawLabel(rctx, field.label || `Field ${idx+1}`, field.gate.x, field.gate.y-1, field.enabled ? "#22c55e" : "#64748b");
-    }else{
-      const centroid = fieldCentroid(field.outline);
-      if(centroid){
-        drawLabel(rctx, (field.label || `Field ${idx+1}`)+" • no gate", centroid.x, centroid.y, "#ea580c");
-      }
-    }
-  });
-
-  // active field outline (dashed)
-  if(planning.activeFieldPoints.length>1){
-    const pts = planning.activeFieldPoints.map(pt=>worldToScreen(pt.x,pt.y));
-    rctx.save();
-    rctx.setLineDash([6,6]);
-    rctx.strokeStyle = "#22c55e";
-    rctx.lineWidth = 2;
-    rctx.beginPath();
-    rctx.moveTo(pts[0].x, pts[0].y);
-    for(let i=1;i<pts.length;i++) rctx.lineTo(pts[i].x, pts[i].y);
-    rctx.stroke();
-    rctx.restore();
-  }
-
-  // active route (dashed)
   if(planning.activeRoutePoints.length>1){
-    const pts = planning.activeRoutePoints.map(pt=>worldToScreen(pt.x,pt.y));
+    const pts=planning.activeRoutePoints.map(pt=>worldToScreen(pt.x,pt.y));
     rctx.save();
-    rctx.lineWidth = Math.max(2, planning.routeWidth * scale * 0.5);
-    rctx.strokeStyle = "#f97316";
+    rctx.lineWidth=Math.max(2,planning.routeWidth*scale*0.5);
+    rctx.strokeStyle="#f97316";
     rctx.setLineDash([8,6]);
     rctx.lineCap="round";
     rctx.beginPath();
-    rctx.moveTo(pts[0].x, pts[0].y);
-    for(let i=1;i<pts.length;i++) rctx.lineTo(pts[i].x, pts[i].y);
+    rctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++)rctx.lineTo(pts[i].x,pts[i].y);
     rctx.stroke();
     rctx.restore();
   }
 
-  // robot + nav markers
+  planning.gates.forEach((gate,idx)=>{
+    const color = gate.enabled ? "#22c55e" : "#64748b";
+    drawDot(rctx,gate.point.x,gate.point.y,color,6);
+    drawLabel(rctx,gate.label || `Gate ${idx+1}`,gate.point.x,gate.point.y-1.05,color);
+  });
+
+  planning.previewGoals.forEach((goal,idx)=>{
+    drawDot(rctx,goal.x,goal.y,"#e11d48",6);
+    drawLabel(rctx,`${idx+1}`,goal.x,goal.y-1.1,"#fda4af");
+  });
+
   const cp=statusData.current_position;
   drawDot(rctx,cp.x,cp.y,"#38bdf8",6);
   drawLabel(rctx,"Robot",cp.x,cp.y-1.2,"#38bdf8");
@@ -602,130 +474,87 @@ function drawAll(){
   drawPlanning();
 }
 
-function updateStatusUI(){
-  document.getElementById("name").textContent=statusData.name ?? "—";
-  document.getElementById("state").textContent=statusData.current_state ?? "—";
-  const dot=document.querySelector("#state-badge .dot");
-  if(dot){
-    dot.className=/ERROR|FAULT/i.test(statusData.current_state)?"dot err":(/IDLE/i.test(statusData.current_state)?"dot idle":"dot active");
-  }
-  const battery=Math.min(Math.max(+statusData.battery||0,0),100);
-  document.getElementById("battery-bar").style.width=`${battery}%`;
-  document.getElementById("battery-text").textContent=`${battery}%`;
-  document.getElementById("emergency").textContent=statusData.emergency?"YES":"No";
-  const curr=statusData.current_position;
-  const tgt=statusData.target_position;
-  const fmt=v=>Number.isFinite(v)?v.toFixed(2):"—";
-  document.getElementById("cur-x").textContent=fmt(curr.x);
-  document.getElementById("cur-y").textContent=fmt(curr.y);
-  document.getElementById("cur-z").textContent=fmt(curr.z);
-  document.getElementById("tgt-x").textContent=fmt(tgt.x);
-  document.getElementById("tgt-y").textContent=fmt(tgt.y);
-  document.getElementById("tgt-z").textContent=fmt(tgt.z);
-  document.getElementById("updated").textContent=new Date().toLocaleTimeString();
-
-  if(!planning.stationName && statusData.name){
-    planning.stationName = statusData.name;
-    elements.stationInput.value = planning.stationName;
-  }
-  updateActionButtons();
-  drawAll();
-}
-
 function updatePlanStatus(message,isError=false,isSuccess=false){
   elements.planStatus.textContent = message || "";
   elements.planStatus.classList.remove("error","success");
-  if(isError) elements.planStatus.classList.add("error");
-  else if(isSuccess) elements.planStatus.classList.add("success");
+  if(isError)elements.planStatus.classList.add("error");
+  else if(isSuccess)elements.planStatus.classList.add("success");
 }
 
-function updateActiveRouteList(){
-  const list = elements.activeRouteList;
+function updateStatusUI(){
+  document.getElementById("name").textContent = statusData.name ?? "—";
+  document.getElementById("state").textContent = statusData.current_state ?? "—";
+  const dot = document.querySelector("#state-badge .dot");
+  if (dot){
+    if (/ERROR|FAULT/i.test(statusData.current_state)) dot.className = "dot err";
+    else if (/IDLE/i.test(statusData.current_state)) dot.className = "dot idle";
+    else dot.className = "dot active";
+  }
+  const battery = Math.min(Math.max(+statusData.battery || 0, 0), 100);
+  document.getElementById("battery-bar").style.width = `${battery}%`;
+  document.getElementById("battery-text").textContent = `${battery}%`;
+  document.getElementById("emergency").textContent = statusData.emergency ? "YES" : "No";
+  const fmt = v => Number.isFinite(v) ? v.toFixed(2) : "—";
+  const curr = statusData.current_position || {};
+  const tgt = statusData.target_position || {};
+  document.getElementById("cur-x").textContent = fmt(curr.x);
+  document.getElementById("cur-y").textContent = fmt(curr.y);
+  document.getElementById("cur-z").textContent = fmt(curr.z);
+  document.getElementById("tgt-x").textContent = fmt(tgt.x);
+  document.getElementById("tgt-y").textContent = fmt(tgt.y);
+  document.getElementById("tgt-z").textContent = fmt(tgt.z);
+  document.getElementById("updated").textContent = new Date().toLocaleTimeString();
+}
+
+function updateRouteList(){
+  const list=elements.activeRouteList;
   list.innerHTML="";
   if(!planning.activeRoutePoints.length){
-    const li=document.createElement("li"); li.textContent="—"; list.appendChild(li); return;
+    const li=document.createElement("li");li.textContent="—";list.appendChild(li);return;
   }
   planning.activeRoutePoints.forEach((pt,idx)=>{
     const li=document.createElement("li");
-    li.innerHTML = `<span>P${idx+1}</span> (${pt.x.toFixed(2)}, ${pt.y.toFixed(2)})`;
+    li.innerHTML=`<span>P${idx+1}</span> (${pt.x.toFixed(2)}, ${pt.y.toFixed(2)})`;
     list.appendChild(li);
   });
 }
 
-function updateRoutesList(){
-  const list = elements.routesList;
+function updateSavedRoutes(){
+  const list=elements.routesList;
   list.innerHTML="";
   if(!planning.routes.length){
-    const li=document.createElement("li"); li.textContent="—"; list.appendChild(li); return;
+    const li=document.createElement("li");li.textContent="—";list.appendChild(li);return;
   }
   planning.routes.forEach(route=>{
     const li=document.createElement("li");
-    const labelInput=document.createElement("input");
-    labelInput.type="text";
-    labelInput.value=route.label;
-    labelInput.addEventListener("input",()=>{route.label = labelInput.value.trim() || route.label;});
-    const meta=document.createElement("span");
-    meta.textContent=`${route.points.length} pts · ${route.width.toFixed(1)}m`;
-    const remove=document.createElement("button");
-    remove.textContent="Remove";
-    remove.addEventListener("click",()=>{removeRoute(route.id);});
-    li.appendChild(labelInput);
-    li.appendChild(meta);
-    li.appendChild(remove);
+    const label=document.createElement("input");label.type="text";label.value=route.label;
+    label.addEventListener("input",()=>{route.label=label.value.trim()||route.label;});
+    const meta=document.createElement("span");meta.textContent=`${route.points.length} pts · ${route.width.toFixed(1)}m`;
+    const remove=document.createElement("button");remove.textContent="Remove";
+    remove.addEventListener("click",()=>{planning.routes=planning.routes.filter(r=>r!==route);updateSavedRoutes();updateActionButtons();drawAll();});
+    li.appendChild(label);li.appendChild(meta);li.appendChild(remove);
     list.appendChild(li);
   });
 }
 
-function updateActiveFieldList(){
-  const list = elements.activeFieldList;
+function updateGatesList(){
+  const list=elements.gatesList;
   list.innerHTML="";
-  if(!planning.activeFieldPoints.length){
-    const li=document.createElement("li"); li.textContent="—"; list.appendChild(li); return;
+  if(!planning.gates.length){
+    const li=document.createElement("li");li.textContent="—";list.appendChild(li);return;
   }
-  planning.activeFieldPoints.forEach((pt,idx)=>{
+  planning.gates.forEach(gate=>{
     const li=document.createElement("li");
-    li.innerHTML = `<span>P${idx+1}</span> (${pt.x.toFixed(2)}, ${pt.y.toFixed(2)})`;
-    list.appendChild(li);
-  });
-}
-
-function updateFieldsList(){
-  const list = elements.fieldsList;
-  list.innerHTML="";
-  if(!planning.fields.length){
-    const li=document.createElement("li"); li.textContent="—"; list.appendChild(li); return;
-  }
-  planning.fields.forEach(field=>{
-    const li=document.createElement("li");
-    const enabled=document.createElement("input");
-    enabled.type="checkbox"; enabled.checked=field.enabled;
-    enabled.addEventListener("change",()=>{field.enabled = enabled.checked; updatePlanStatus(""); updateActionButtons();});
-    const label=document.createElement("input");
-    label.type="text"; label.value=field.label;
-    label.addEventListener("input",()=>{field.label = label.value.trim() || field.label;});
-    const info=document.createElement("span");
-    const gateText = field.gate ? `Gate (${field.gate.x.toFixed(2)}, ${field.gate.y.toFixed(2)})` : "Gate pending";
-    info.textContent = `${field.outline.length} pts · ${gateText}`;
-    const gateBtn=document.createElement("button");
-    gateBtn.textContent = planning.activeGateFieldId === field.id && planning.gateMode ? "Click map…" : "Set Gate";
-    gateBtn.classList.toggle("active", planning.activeGateFieldId === field.id && planning.gateMode);
-    gateBtn.addEventListener("click",()=>{
-      planning.activeGateFieldId = field.id;
-      if(!planning.gateMode){
-        planning.gateMode = true;
-        elements.toggleGate.classList.add("active");
-        elements.toggleGate.textContent = "Gate Mode (On)";
-      }
-      updatePlanStatus(`Gate mode: click the map to place gate for ${field.label}.`);
-      updateFieldsList();
-    });
-    const remove=document.createElement("button");
-    remove.textContent="Remove";
-    remove.addEventListener("click",()=>{removeField(field.id);});
+    const enabled=document.createElement("input");enabled.type="checkbox";enabled.checked=gate.enabled;
+    enabled.addEventListener("change",()=>{gate.enabled=enabled.checked;updateActionButtons();});
+    const label=document.createElement("input");label.type="text";label.value=gate.label;
+    label.addEventListener("input",()=>{gate.label=label.value.trim()||gate.label;drawAll();});
+    const coords=document.createElement("span");coords.textContent=`(${gate.point.x.toFixed(2)}, ${gate.point.y.toFixed(2)})`;
+    const remove=document.createElement("button");remove.textContent="Remove";
+    remove.addEventListener("click",()=>{planning.gates=planning.gates.filter(g=>g!==gate);updateGatesList();updateActionButtons();drawAll();});
     li.appendChild(enabled);
     li.appendChild(label);
-    li.appendChild(info);
-    li.appendChild(gateBtn);
+    li.appendChild(coords);
     li.appendChild(remove);
     list.appendChild(li);
   });
@@ -735,228 +564,96 @@ function updateActionButtons(){
   elements.undoPoint.disabled = planning.activeRoutePoints.length===0;
   elements.clearRoute.disabled = planning.activeRoutePoints.length===0;
   elements.completeRoute.disabled = planning.activeRoutePoints.length<2;
-  elements.undoFieldPoint.disabled = planning.activeFieldPoints.length===0;
-  elements.clearField.disabled = planning.activeFieldPoints.length===0;
-  elements.completeField.disabled = planning.activeFieldPoints.length<3;
-  const readyFields = planning.fields.filter(f=>f.enabled && f.gate && f.outline.length>=3).length;
-  elements.confirm.disabled = !planning.stationName || !planning.robotAddress || planning.routes.length===0 || readyFields===0;
+  const hasRoutes = planning.routes.length>0;
+  const hasGate = planning.gates.some(g=>g.enabled);
+  elements.confirm.disabled = !planning.stationName || !planning.robotAddress || !hasRoutes || !hasGate;
+  elements.calcShortest.disabled = !planning.stationName;
 }
 
 function toggleRouteMode(){
-  planning.drawingRoute = !planning.drawingRoute;
-  if(planning.drawingRoute){
-    planning.drawingField = false;
-    elements.toggleField.classList.remove("active");
-    elements.toggleField.textContent = "Start Field";
-    if(planning.gateMode){
-      planning.gateMode = false;
-      planning.activeGateFieldId = null;
-      elements.toggleGate.classList.remove("active");
-      elements.toggleGate.textContent = "Gate Mode";
-      updateFieldsList();
-    }
-  }
+  planning.drawingRoute=!planning.drawingRoute;
   elements.toggleRoute.classList.toggle("active", planning.drawingRoute);
   elements.toggleRoute.textContent = planning.drawingRoute ? "Stop Route" : "Start Route";
+  planning.previewGoals = [];
   if(planning.drawingRoute){
-    updatePlanStatus("Route mode: click the map to add path points.");
-  } else {
+    updatePlanStatus("Route mode active: click to add path points.");
+  }else{
     updatePlanStatus("Route drawing paused.");
   }
 }
 
-function toggleFieldMode(){
-  planning.drawingField = !planning.drawingField;
-  if(planning.drawingField){
-    planning.drawingRoute = false;
-    elements.toggleRoute.classList.remove("active");
-    elements.toggleRoute.textContent = "Start Route";
-    if(planning.gateMode){
-      planning.gateMode = false;
-      planning.activeGateFieldId = null;
-      elements.toggleGate.classList.remove("active");
-      elements.toggleGate.textContent = "Gate Mode";
-      updateFieldsList();
-    }
-  }
-  elements.toggleField.classList.toggle("active", planning.drawingField);
-  elements.toggleField.textContent = planning.drawingField ? "Stop Field" : "Start Field";
-  if(planning.drawingField){
-    updatePlanStatus("Field mode: click the map to trace the field outline.");
-  }else{
-    updatePlanStatus("Field drawing paused.");
-  }
-}
-
 function toggleGateMode(){
-  if(!planning.fields.length){
-    updatePlanStatus("Create a field before placing a gate.", true);
-    return;
-  }
-  planning.gateMode = !planning.gateMode;
-  if(!planning.gateMode){
-    planning.activeGateFieldId = null;
-  }
+  planning.gateMode=!planning.gateMode;
   elements.toggleGate.classList.toggle("active", planning.gateMode);
   elements.toggleGate.textContent = planning.gateMode ? "Gate Mode (On)" : "Gate Mode";
-  if(planning.gateMode){
-    updatePlanStatus("Gate mode: click the map to place a gate. Select a field to target.");
-  } else {
-    updatePlanStatus("Gate placement paused.");
-  }
-  updateFieldsList();
+  planning.previewGoals = [];
+  updatePlanStatus(planning.gateMode?"Gate mode active: click to drop gates.":"Gate placement paused.");
 }
 
 function addRoutePoint(world){
-  const snapped = findSnapTarget(world);
-  const point = snapped ? snapped : {x: world.x, y: world.y};
-  planning.activeRoutePoints.push(point);
-  updateActiveRouteList();
-  updateActionButtons();
-  drawAll();
-}
-
-function addFieldPoint(world){
-  const snapped = findSnapTarget(world);
-  const point = snapped ? snapped : {x: world.x, y: world.y};
-  planning.activeFieldPoints.push(point);
-  updateActiveFieldList();
+  planning.activeRoutePoints.push(world);
+  updateRouteList();
   updateActionButtons();
   drawAll();
 }
 
 function undoRoutePoint(){
   planning.activeRoutePoints.pop();
-  updateActiveRouteList();
-  updateActionButtons();
-  drawAll();
-}
-
-function undoFieldPoint(){
-  planning.activeFieldPoints.pop();
-  updateActiveFieldList();
+  updateRouteList();
   updateActionButtons();
   drawAll();
 }
 
 function clearActiveRoute(){
-  planning.activeRoutePoints = [];
-  updateActiveRouteList();
-  updateActionButtons();
-  drawAll();
-}
-
-function clearActiveField(){
-  planning.activeFieldPoints = [];
-  updateActiveFieldList();
+  planning.activeRoutePoints=[];
+  updateRouteList();
   updateActionButtons();
   drawAll();
 }
 
 function completeRoute(){
-  if(planning.activeRoutePoints.length < 2){
+  if(planning.activeRoutePoints.length<2){
     updatePlanStatus("Add at least two points before completing a route.", true);
     return;
   }
-  const id = `route-${planning.nextRouteId++}`;
-  const label = `Route ${planning.routes.length+1}`;
+  const label=`Route ${planning.routes.length+1}`;
   planning.routes.push({
-    id,
     label,
     width: planning.routeWidth,
     points: planning.activeRoutePoints.slice()
   });
-  planning.activeRoutePoints = [];
-  planning.drawingRoute = false;
+  planning.activeRoutePoints=[];
+  planning.drawingRoute=false;
   elements.toggleRoute.classList.remove("active");
-  elements.toggleRoute.textContent = "Start Route";
-  updateActiveRouteList();
-  updateRoutesList();
+  elements.toggleRoute.textContent="Start Route";
+  planning.previewGoals=[];
+  updateRouteList();
+  updateSavedRoutes();
   updateActionButtons();
   drawAll();
-  updatePlanStatus(`Saved ${label}.`, false, true);
+  updatePlanStatus(`${label} saved.`, false, true);
 }
 
-function completeField(){
-  if(planning.activeFieldPoints.length < 3){
-    updatePlanStatus("Add at least three points before completing a field.", true);
-    return;
-  }
-  const id = `field-${planning.nextFieldId++}`;
-  const label = `Field ${planning.fields.length+1}`;
-  planning.fields.push({
-    id,
-    label,
-    enabled: true,
-    outline: planning.activeFieldPoints.slice(),
-    gate: null
-  });
-  planning.activeFieldPoints = [];
-  planning.drawingField = false;
-  elements.toggleField.classList.remove("active");
-  elements.toggleField.textContent = "Start Field";
-  updateActiveFieldList();
-  updateFieldsList();
-  updateActionButtons();
-  drawAll();
-  updatePlanStatus(`Saved ${label}.`, false, true);
-}
-
-function removeRoute(id){
-  planning.routes = planning.routes.filter(r=>r.id!==id);
-  updateRoutesList();
+function addGate(world){
+  const label=`Gate ${planning.gates.length+1}`;
+  planning.gates.push({label,enabled:true,point:world});
+  planning.previewGoals=[];
+  updateGatesList();
   updateActionButtons();
   drawAll();
 }
 
-function removeField(id){
-  planning.fields = planning.fields.filter(f=>f.id!==id);
-  if(planning.activeGateFieldId === id){
-    planning.activeGateFieldId = null;
-  }
-  updateFieldsList();
+function clearGates(){
+  planning.gates=[];
+  planning.previewGoals=[];
+  updateGatesList();
   updateActionButtons();
   drawAll();
-}
-
-function placeGate(world){
-  if(!planning.fields.length){
-    updatePlanStatus("Create a field before placing a gate.", true);
-    return;
-  }
-  let target = planning.fields.find(f=>f.id===planning.activeGateFieldId);
-  if(!target){
-    target = planning.fields.find(field=>pointInPolygon(world, field.outline));
-  }
-  if(!target){
-    let best = null;
-    let bestDist = Infinity;
-    planning.fields.forEach(field=>{
-      const center = fieldCentroid(field.outline);
-      if(!center) return;
-      const d = distance2d(world, center);
-      if(d < bestDist){
-        bestDist = d;
-        best = field;
-      }
-    });
-    target = best;
-  }
-  if(!target){
-    updatePlanStatus("No field available for gate placement.", true);
-    return;
-  }
-  target.gate = {x: world.x, y: world.y};
-  planning.activeGateFieldId = target.id;
-  updateFieldsList();
-  updateActionButtons();
-  drawAll();
-  updatePlanStatus(`Gate set for ${target.label}.`, false, true);
 }
 
 function confirmPlan(){
-  if(elements.confirm.disabled) return;
-  const payload = {
+  if(elements.confirm.disabled)return;
+  const payload={
     station_name: planning.stationName,
     robot_address: planning.robotAddress,
     visit_all_fields: planning.visitAll,
@@ -970,20 +667,15 @@ function confirmPlan(){
       width: route.width,
       waypoints: route.points.map(pt=>({x:pt.x,y:pt.y,z:0}))
     })),
-    fields: planning.fields
-      .filter(field=>field.outline.length>=3)
-      .map(field=>{
-        const gatePoint = field.gate || fieldCentroid(field.outline) || {x:0,y:0};
-        return {
-          label: field.label,
-          enabled: field.enabled,
-          gate: {x:gatePoint.x,y:gatePoint.y,z:0},
-          outline: field.outline.map(pt=>({x:pt.x,y:pt.y,z:0}))
-        };
-      })
+    fields: planning.gates.map(gate=>({
+      label: gate.label,
+      enabled: gate.enabled,
+      gate: {x:gate.point.x,y:gate.point.y,z:0}
+    }))
   };
-  updatePlanStatus("Sending plan…");
-  elements.confirm.disabled = true;
+
+  updatePlanStatus("Submitting plan…");
+  elements.confirm.disabled=true;
   fetch("/api/macro-plan",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -1001,9 +693,42 @@ function confirmPlan(){
   });
 }
 
+function requestPreview(){
+  if(!planning.stationName){
+    updatePlanStatus("Station namespace required for preview.", true);
+    return;
+  }
+  const params=new URLSearchParams({station:planning.stationName});
+  if(planning.robotAddress) params.set("robot", planning.robotAddress);
+  updatePlanStatus("Requesting shortest path…");
+  fetch(`/api/route-preview?${params.toString()}`,{cache:"no-store"})
+    .then(r=>r.json().then(body=>({ok:r.ok,body})))
+    .then(({ok,body})=>{
+      if(!ok){
+        updatePlanStatus(body.error || "No route available yet.", true);
+        planning.previewGoals=[];
+        drawAll();
+        return;
+      }
+      planning.previewGoals = (body.goals||[]).map(pt=>({x:+pt.x,y:+pt.y,z:+pt.z}));
+      if(!planning.previewGoals.length){
+        updatePlanStatus("No route data returned.", true);
+        drawAll();
+        return;
+      }
+      updatePlanStatus(`Shortest path received for ${body.robot}.`, false, true);
+      drawAll();
+    })
+    .catch(err=>{
+      planning.previewGoals=[];
+      updatePlanStatus(`Preview failed: ${err}`, true);
+      drawAll();
+    });
+}
+
 function resize(){
   const wrapper=document.getElementById("map-wrapper");
-  const w=wrapper.clientWidth || 800;
+  const w=wrapper.clientWidth||800;
   base.width=w;base.height=w;
   over.width=w;over.height=w;
   routeCanvas.width=w;routeCanvas.height=w;
@@ -1011,38 +736,35 @@ function resize(){
 }
 
 elements.stationInput.addEventListener("input",ev=>{
-  planning.stationName = ev.target.value.trim();
+  planning.stationName=ev.target.value.trim();
   updateActionButtons();
 });
 elements.robotInput.addEventListener("input",ev=>{
-  planning.robotAddress = ev.target.value.trim();
+  planning.robotAddress=ev.target.value.trim();
   updateActionButtons();
 });
 elements.routeWidth.addEventListener("input",ev=>{
-  planning.routeWidth = parseFloat(ev.target.value) || 2;
-  if(planning.drawingRoute) updatePlanStatus(`Active route width set to ${planning.routeWidth.toFixed(1)}m.`);
+  planning.routeWidth=parseFloat(ev.target.value)||2;
+  updatePlanStatus(`Route width set to ${planning.routeWidth.toFixed(1)}m.`);
 });
+elements.visitAll.addEventListener("change",ev=>{
+  planning.visitAll=ev.target.checked;
+});
+
 elements.toggleRoute.addEventListener("click",toggleRouteMode);
 elements.completeRoute.addEventListener("click",completeRoute);
 elements.undoPoint.addEventListener("click",undoRoutePoint);
 elements.clearRoute.addEventListener("click",clearActiveRoute);
-elements.toggleField.addEventListener("click",toggleFieldMode);
-elements.completeField.addEventListener("click",completeField);
-elements.undoFieldPoint.addEventListener("click",undoFieldPoint);
-elements.clearField.addEventListener("click",clearActiveField);
 elements.toggleGate.addEventListener("click",toggleGateMode);
+elements.clearGates.addEventListener("click",clearGates);
 elements.confirm.addEventListener("click",confirmPlan);
-elements.visitAll.addEventListener("change",ev=>{
-  planning.visitAll = ev.target.checked;
-});
+elements.calcShortest.addEventListener("click",requestPreview);
 
 routeCanvas.addEventListener("click",evt=>{
   const rect=routeCanvas.getBoundingClientRect();
   const world=screenToWorld(evt.clientX-rect.left, evt.clientY-rect.top);
   if(planning.gateMode){
-    placeGate(world);
-  }else if(planning.drawingField){
-    addFieldPoint(world);
+    addGate(world);
   }else if(planning.drawingRoute){
     addRoutePoint(world);
   }
@@ -1066,7 +788,13 @@ async function fetchStatus(){
       statusData.emergency=Boolean(j.emergency);
       statusData.current_position=j.current_position;
       statusData.target_position=j.target_position;
+      if(!planning.stationName && statusData.name){
+        planning.stationName=statusData.name;
+        elements.stationInput.value=statusData.name;
+      }
       updateStatusUI();
+      drawAll();
+      updateActionButtons();
     }
   }catch(err){console.error("Status fetch failed",err);}
 }
@@ -1077,23 +805,23 @@ async function fetchSoil(){
     const j=await r.json();
     soilSamples=Array.isArray(j?.samples)? j.samples : [];
     drawAll();
-  }catch(err){console.error("Soil fetch failed",err);} }
+  }catch(err){console.error("Soil fetch failed",err);}
+}
 
-function init(){
-  updateActiveRouteList();
-  updateRoutesList();
-  updateActiveFieldList();
-  updateFieldsList();
+function initialise(){
+  updateRouteList();
+  updateSavedRoutes();
+  updateGatesList();
   updateActionButtons();
-  updatePlanStatus("Route mode ready. Start drawing to define paths.");
+  updatePlanStatus("Route planner ready. Start drawing to define corridors.");
   resize();
   fetchStatus();
   fetchSoil();
-  setInterval(fetchStatus, 1000);
-  setInterval(fetchSoil, 1500);
+  setInterval(fetchStatus,1000);
+  setInterval(fetchSoil,1500);
 }
 
-init();
+initialise();
 </script>
 </body>
 </html>

@@ -1,11 +1,15 @@
 import atexit
 from collections.abc import Iterable
+from typing import Dict, Optional
 from flask import Flask, jsonify, send_file, request
 
 import rclpy
 from rclpy.node import Node
+from rclpy import spin_once
+from rclpy.subscription import Subscription
 from unomas.srv import StatusUpdateService, TerrainSoilData, UpdateMacroPlan
-from unomas.msg import MacroPlan as MacroPlanMsg, FieldPlan, RoutePlan
+from unomas.msg import (MacroPlan as MacroPlanMsg, FieldPlan, RoutePlan,
+                        AddressedPoseArray)
 from geometry_msgs.msg import Point
 
 app = Flask(__name__)
@@ -57,6 +61,39 @@ class MacroPlanClient(Node):
         if fut.result() is None:
             raise RuntimeError("Macro plan service returned no result.")
         return fut.result()
+
+
+class GoalListener(Node):
+    def __init__(self):
+        super().__init__("ui_goal_listener")
+        self._subs: Dict[str, Subscription] = {}
+        self._latest: Dict[str, AddressedPoseArray] = {}
+
+    def ensure_subscription(self, station: str) -> None:
+        if station in self._subs:
+            return
+
+        topic = f"{station}/goals"
+        self._latest.setdefault(station, AddressedPoseArray())
+
+        def _callback(msg: AddressedPoseArray, sta: str = station):
+            self._latest[sta] = msg
+
+        self._subs[station] = self.create_subscription(
+            AddressedPoseArray,
+            topic,
+            _callback,
+            10,
+        )
+        self.get_logger().info(f"Subscribed to '{topic}' for route preview data.")
+
+    def latest(self, station: str, robot: Optional[str]) -> Optional[AddressedPoseArray]:
+        msg = self._latest.get(station)
+        if msg is None or not msg.poses:
+            return None
+        if robot and msg.address and msg.address != robot:
+            return None
+        return msg
 
 def packet_to_dict(p):
     return {
@@ -147,9 +184,10 @@ _status_client = None
 _soil_client = None
 _plan_client = None
 _last_robot_point: Point | None = None
+_goal_listener: GoalListener | None = None
 
 def _init_ros_once():
-    global _status_client, _soil_client, _plan_client
+    global _status_client, _soil_client, _plan_client, _goal_listener
     if not rclpy.ok():
         rclpy.init(args=None)
     if _status_client is None:
@@ -158,6 +196,8 @@ def _init_ros_once():
         _soil_client = SoilClient()
     if _plan_client is None:
         _plan_client = MacroPlanClient()
+    if _goal_listener is None:
+        _goal_listener = GoalListener()
 
 _init_ros_once()
 
@@ -176,6 +216,11 @@ def _shutdown_ros():
     try:
         if _plan_client is not None:
             _plan_client.destroy_node()
+    except Exception:
+        pass
+    try:
+        if _goal_listener is not None:
+            _goal_listener.destroy_node()
     except Exception:
         pass
     if rclpy.ok():
@@ -227,6 +272,38 @@ def api_macro_plan():
         return jsonify({"accepted": bool(result.accepted), "message": result.message}), status_code
     except Exception as exc:
         return jsonify({"accepted": False, "message": str(exc)}), 503
+
+
+@app.get("/api/route-preview")
+def api_route_preview():
+    station = (request.args.get("station") or "").strip()
+    robot = (request.args.get("robot") or "").strip()
+
+    if not station:
+        return jsonify({"error": "station parameter required"}), 400
+    if _goal_listener is None:
+        return jsonify({"error": "goal listener unavailable"}), 500
+
+    _goal_listener.ensure_subscription(station)
+    # Pump callbacks to process any pending goal messages
+    for _ in range(3):
+        spin_once(_goal_listener, timeout_sec=0.05)
+
+    msg = _goal_listener.latest(station, robot if robot else None)
+    if msg is None or not msg.poses:
+        return jsonify({"error": "no route data available"}), 404
+
+    goals = [{
+        "x": float(p.position.x),
+        "y": float(p.position.y),
+        "z": float(p.position.z)
+    } for p in msg.poses]
+
+    return jsonify({
+        "station": station,
+        "robot": msg.address,
+        "goals": goals
+    })
 
 # from flask import send_file
 # @app.get("/status")
