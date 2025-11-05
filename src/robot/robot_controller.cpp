@@ -50,23 +50,23 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     loop_period_ = std::chrono::duration<double>(1.0 / loop_rate_hz);
 
     // initialise feedback publishers   
-    std::string state_topic = "/state";
+    std::string state_topic = "/state"; //check
     statePub_ = node_->create_publisher<std_msgs::msg::String>(state_topic, 10);
-    std::string emergency_topic = "/emergency";
+    std::string emergency_topic = "/emergency"; //check
     emergencyPub_ = node_->create_publisher<std_msgs::msg::Bool>(emergency_topic, 10);
-    std::string goal_topic = "/goal";
+    std::string goal_topic = "/goal"; //check
     goalPub_ = node_->create_publisher<geometry_msgs::msg::Point>(goal_topic, 10);
-    std::string battery_topic = "/battery";
+    std::string battery_topic = "/battery"; //check
     batteryPub_ = node_->create_publisher<std_msgs::msg::Float32>(battery_topic, 10);
-    std::string position_topic = "/odom";
+    std::string position_topic = "/odom"; //check
     odomPub_ = node_->create_publisher<geometry_msgs::msg::Point>(position_topic, 10);
-    std::string connection_topic = "/connection";
+    std::string connection_topic = "/connection"; //check
     connectionPub_ = node_->create_publisher<std_msgs::msg::Bool>(connection_topic, 10);
 
     // initialise publishers
     std::string nav_topic = "/goal_pose";
     navPub_ = node_->create_publisher<geometry_msgs::msg::PoseStamped>(nav_topic, 10);
-    std::string soil_topic = "/soil";
+    std::string soil_topic = "/soil";   // check
     soil_info_publisher_ = node_->create_publisher<unomas::msg::SoilInfo>(soil_topic, 10);
     std::string cmd_vel_topic = "/cmd_vel"; //In a multi robot setup this would be combined with serial_id as a prefix
     cmdVelPub_ = node_->create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic, 10);
@@ -76,11 +76,11 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     // goalsSub_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(goals_topic, 10, std::bind(&Robot::RobotController::subscribeGoals, this, std::placeholders::_1));
     // std::string obstacles_topic = "/obstacles";
     // obstaclesSub_ = node_->create_subscription<custom_msgs::Obstacles>(obstacles_topic, 10, std::bind(&Robot::RobotController::subscribeObstacles, this, std::placeholders::_1));
-    std::string groundLiDAR_topic = "/laserscan2";
+    std::string groundLiDAR_topic = "/secondary_scan";
     groundLiDARSub_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(groundLiDAR_topic, 10, std::bind(&Robot::RobotController::subscribeGroundLiDAR, this, std::placeholders::_1));
     std::string odom_topic = "/odometry/filtered"; //Filtered uses the IMU to correct drift (better for NAV2)
     odom_subscriber_ = node_->create_subscription<nav_msgs::msg::Odometry>(odom_topic, 10, std::bind(&Robot::RobotController::odomCallback, this, std::placeholders::_1));
-    std::string E_Return_topic = "/emergency_return";
+    std::string E_Return_topic = "/emergency_return"; // check
     emergencySub_ = node_->create_subscription<geometry_msgs::msg::Point>(E_Return_topic, 10, std::bind(&Robot::RobotController::emergencyCallback, this, std::placeholders::_1));
 
     // initialise wall timer for feedback pubs
