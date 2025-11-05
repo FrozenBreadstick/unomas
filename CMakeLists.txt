@@ -18,6 +18,8 @@ find_package(grid_map_core REQUIRED)
 
 find_package(rclcpp REQUIRED)
 
+find_package(sensor_msgs REQUIRED)
+
 
 # custom messages
 find_package(rosidl_default_generators REQUIRED)
@@ -90,6 +92,7 @@ ament_target_dependencies(robot
  rclcpp
  geometry_msgs
  nav_msgs
+ sensor_msgs
 )
 
 #install executables to lib

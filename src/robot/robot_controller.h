@@ -2,11 +2,20 @@
 #define ROBOT_INTERFACE_H
 
 #include "rclcpp/rclcpp.hpp"
+
 #include "nav_msgs/msg/odometry.hpp"
+
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_array.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+
 #include "sensor_msgs/msg/laser_scan.hpp"
+
+#include "std_msgs/msg/string.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float32.hpp"
 
 #include "unomas/srv/query_soil.hpp"
 #include "unomas/msg/soil_info.hpp"
@@ -350,7 +359,7 @@ namespace Robot {
 
             // functional subscribers
             rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr goalsSub_; //!< subscriber for goal poses
-            rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr obstaclesSub_; //!< subscriber for obstacles
+            //rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr obstaclesSub_; //!< subscriber for obstacles
             rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr groundLiDARSub_; //!< subscriber for ground LiDAR
             rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber_; //!< subscriber for odometry
             rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr emergencySub_; //!< subscriber for emergency return call
@@ -504,7 +513,7 @@ namespace Robot {
 
             } cropData_;
 
-    }
+    };
 }
 
 #endif // ROBOT_INTERFACE_H
