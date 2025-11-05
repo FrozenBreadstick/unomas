@@ -32,11 +32,11 @@ Robot::RobotUplink::RobotUplink(std::string serial_id) :
         "Registrar", 10);
 
 
-    // emergency_publisher_ = this->create_publisher<std_msgs::msg::Bool>("dumpTopic00", 10);
-    // battery_publisher_ = this->create_publisher<std_msgs::msg::Int32>("dumpTopic01", 10);
-    // position_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic02", 10);
-    // state_publisher_ = this->create_publisher<std_msgs::msg::String>("dumpTopic03", 10);
-    // target_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("dumpTopic04", 10);
+    // emergency_publisher_ = this->create_publisher<std_msgs::msg::Bool>("emergency", 10);
+    // battery_publisher_ = this->create_publisher<std_msgs::msg::Int32>("battery", 10);
+    // position_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("current_position", 10);
+    // state_publisher_ = this->create_publisher<std_msgs::msg::String>("state", 10);
+    // target_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("current_goal", 10);
 }
 
 Robot::RobotUplink::~RobotUplink()
@@ -85,6 +85,13 @@ void Robot::RobotUplink::UplinkTimerCallback()
     }
     else
     {
+        //get data
+        emergency_ = controller_->getEmergency();
+        battery_ = controller_->getBattery();
+        position_ = controller_->getPosition();
+        state_ = controller_->getStatus();
+        target_ = controller_->getTarget();
+
         emergency_publisher_->publish(std_msgs::msg::Bool().set__data(emergency_));
         battery_publisher_->publish(std_msgs::msg::Int32().set__data(battery_));
         position_publisher_->publish(position_);

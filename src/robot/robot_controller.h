@@ -303,7 +303,7 @@ namespace Robot {
 
             /*! @brief getter for battery level of robot
              *
-             *  @return float - battery level
+             *  @return int - battery level
              */
             int getBattery();
 
@@ -403,7 +403,7 @@ namespace Robot {
                 std::mutex feedbackMutex; // mutex for feedback data
 
                 bool emergency; // true if robot is in emergency
-                float battery;   // battery level
+                int battery;   // battery level
                 geometry_msgs::msg::Point currentPosition;   // current position of the robot
                 std::string state; // current state of the robot 
                 bool connection;   // true if robot is connected to base station

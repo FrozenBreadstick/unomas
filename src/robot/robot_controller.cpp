@@ -37,7 +37,7 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     feedbackData_.noGoal.z = -1;
 
     feedbackData_.emergency = false;
-    feedbackData_.battery = 100;
+    feedbackData_.battery = 98;
     feedbackData_.state = "IDLE";
     feedbackData_.currentGoal = feedbackData_.noGoal;
     feedbackData_.currentPosition.x = 0;
@@ -50,18 +50,18 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     loop_period_ = std::chrono::duration<double>(1.0 / loop_rate_hz);
 
     // initialise feedback publishers   
-    std::string state_topic = "/state"; //check
-    statePub_ = node_->create_publisher<std_msgs::msg::String>(state_topic, 10);
-    std::string emergency_topic = "/emergency"; //check
-    emergencyPub_ = node_->create_publisher<std_msgs::msg::Bool>(emergency_topic, 10);
-    std::string goal_topic = "/goal"; //check
-    goalPub_ = node_->create_publisher<geometry_msgs::msg::Point>(goal_topic, 10);
-    std::string battery_topic = "/battery"; //check
-    batteryPub_ = node_->create_publisher<std_msgs::msg::Float32>(battery_topic, 10);
-    std::string position_topic = "/odom"; //check
-    odomPub_ = node_->create_publisher<geometry_msgs::msg::Point>(position_topic, 10);
-    std::string connection_topic = "/connection"; //check
-    connectionPub_ = node_->create_publisher<std_msgs::msg::Bool>(connection_topic, 10);
+    // std::string state_topic = "/state"; //check
+    // statePub_ = node_->create_publisher<std_msgs::msg::String>(state_topic, 10);
+    // std::string emergency_topic = "/emergency"; //check
+    // emergencyPub_ = node_->create_publisher<std_msgs::msg::Bool>(emergency_topic, 10);
+    // std::string goal_topic = "/goal"; //check
+    // goalPub_ = node_->create_publisher<geometry_msgs::msg::Point>(goal_topic, 10);
+    // std::string battery_topic = "/battery"; //check
+    // batteryPub_ = node_->create_publisher<std_msgs::msg::Float32>(battery_topic, 10);
+    // std::string position_topic = "/odom"; //check
+    // odomPub_ = node_->create_publisher<geometry_msgs::msg::Point>(position_topic, 10);
+    // std::string connection_topic = "/connection"; //check
+    // connectionPub_ = node_->create_publisher<std_msgs::msg::Bool>(connection_topic, 10);
 
     // initialise publishers
     std::string nav_topic = "/goal_pose";
@@ -84,7 +84,7 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     emergencySub_ = node_->create_subscription<geometry_msgs::msg::Point>(E_Return_topic, 10, std::bind(&Robot::RobotController::emergencyCallback, this, std::placeholders::_1));
 
     // initialise wall timer for feedback pubs
-    timer_ = node_->create_wall_timer(std::chrono::milliseconds(500), std::bind(&Robot::RobotController::timer_callback, this));
+    //timer_ = node_->create_wall_timer(std::chrono::milliseconds(500), std::bind(&Robot::RobotController::timer_callback, this));
 
     // initialise service clients
     soil_query_client_ = node_->create_client<unomas::srv::QuerySoil>("query_soil");
@@ -114,130 +114,130 @@ Robot::RobotController::~RobotController()
 //-------------------  FEEDBACK PUBLISHERS  -------------------//
 
 
-// publisher callback that publishes the current state of the robot to the base station
-void Robot::RobotController::publishState()
-{
-    // make message
-    std_msgs::msg::String msg;
+// // publisher callback that publishes the current state of the robot to the base station
+// void Robot::RobotController::publishState()
+// {
+//     // make message
+//     std_msgs::msg::String msg;
 
-    msg.data = feedbackData_.state;
+//     msg.data = feedbackData_.state;
 
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing %s", msg.data.c_str());
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing %s", msg.data.c_str());
 
-    // publish message
-    statePub_->publish(msg);
-
-
-}
+//     // publish message
+//     statePub_->publish(msg);
 
 
-// publisher callback that publishes the emergency state of the robot to the base station
-void Robot::RobotController::publishEmergency()
-{
-    // make message
-    std_msgs::msg::Bool msg;
-
-    msg.data = feedbackData_.emergency;
-
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing %s", msg.data ? "true" : "false");
-
-    // publish message
-    emergencyPub_->publish(msg);
-}
+// }
 
 
-// publisher callback that publishes the current goal of the robot to the base station
-void Robot::RobotController::publishGoal()
-{
-    // make message
-    geometry_msgs::msg::Point msg;
+// // publisher callback that publishes the emergency state of the robot to the base station
+// void Robot::RobotController::publishEmergency()
+// {
+//     // make message
+//     std_msgs::msg::Bool msg;
 
-    msg = feedbackData_.currentGoal;
+//     msg.data = feedbackData_.emergency;
 
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing goal: (%.2f, %.2f)", msg.x, msg.y);
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing %s", msg.data ? "true" : "false");
 
-    // publish message
-    goalPub_->publish(msg);
-}
-
-
-// publisher callback that publishes battery level
-void Robot::RobotController::publishBattery()
-{
-    // make message
-    std_msgs::msg::Float32 msg;
-
-    msg.data = feedbackData_.battery;
-
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing battery level: %.2f", msg.data);
-
-    // publish message
-    batteryPub_->publish(msg);
-}
+//     // publish message
+//     emergencyPub_->publish(msg);
+// }
 
 
-// publisher callback that publishes odometry
-void Robot::RobotController::publishOdometry()
-{
-    // make message
-    geometry_msgs::msg::Point msg;
+// // publisher callback that publishes the current goal of the robot to the base station
+// void Robot::RobotController::publishGoal()
+// {
+//     // make message
+//     geometry_msgs::msg::Point msg;
 
-    feedbackData_.currentPosition = getOdometry().pose.pose.position;
+//     msg = feedbackData_.currentGoal;
 
-    msg = feedbackData_.currentPosition;
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing goal: (%.2f, %.2f)", msg.x, msg.y);
 
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing odometry: (%.2f, %.2f, %.2f)", msg.x, msg.y, msg.z);
-
-    // publish message
-    odomPub_->publish(msg);
-}
+//     // publish message
+//     goalPub_->publish(msg);
+// }
 
 
-// publisher callback that publishes connection status
-void Robot::RobotController::publishConnection()
-{
-    // make message
-    std_msgs::msg::Bool msg;
+// // publisher callback that publishes battery level
+// void Robot::RobotController::publishBattery()
+// {
+//     // make message
+//     std_msgs::msg::Float32 msg;
 
-    msg.data = feedbackData_.connection;
+//     msg.data = feedbackData_.battery;
 
-    // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing connection status: %s", msg.data ? "true" : "false");
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing battery level: %.2f", msg.data);
 
-    // publish message
-    connectionPub_->publish(msg);
-}
+//     // publish message
+//     batteryPub_->publish(msg);
+// }
 
 
-// timer callback that calls feedback publishers
-void Robot::RobotController::timer_callback()
-{
-    // lock feedback mutex
-    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+// // publisher callback that publishes odometry
+// void Robot::RobotController::publishOdometry()
+// {
+//     // make message
+//     geometry_msgs::msg::Point msg;
 
-    // publish state
-    publishState();
+//     feedbackData_.currentPosition = getOdometry().pose.pose.position;
 
-    // publish emergency
-    publishEmergency();
+//     msg = feedbackData_.currentPosition;
 
-    // publish goal
-    publishGoal();
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing odometry: (%.2f, %.2f, %.2f)", msg.x, msg.y, msg.z);
 
-    // publish battery
-    publishBattery();
+//     // publish message
+//     odomPub_->publish(msg);
+// }
 
-    // publish odometry
-    publishOdometry();
 
-    // publish connection
-    publishConnection();
-}
+// // publisher callback that publishes connection status
+// void Robot::RobotController::publishConnection()
+// {
+//     // make message
+//     std_msgs::msg::Bool msg;
+
+//     msg.data = feedbackData_.connection;
+
+//     // log message
+//     RCLCPP_INFO(node_->get_logger(), "Publishing connection status: %s", msg.data ? "true" : "false");
+
+//     // publish message
+//     connectionPub_->publish(msg);
+// }
+
+
+// // timer callback that calls feedback publishers
+// void Robot::RobotController::timer_callback()
+// {
+//     // lock feedback mutex
+//     std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
+//     // publish state
+//     publishState();
+
+//     // publish emergency
+//     publishEmergency();
+
+//     // publish goal
+//     publishGoal();
+
+//     // publish battery
+//     publishBattery();
+
+//     // publish odometry
+//     publishOdometry();
+
+//     // publish connection
+//     publishConnection();
+// }
 
 
 //-------------------  FUNCTIONAL PUBLISHERS  -------------------//
@@ -1247,15 +1247,6 @@ nav_msgs::msg::Odometry Robot::RobotController::getOdometry()
 }
 
 
-// getter for current goal
-geometry_msgs::msg::Pose Robot::RobotController::getGoal()
-{
-    std::lock_guard<std::mutex> lock(goals_.goalsMutex);
-
-    return goals_.currentGoal; //Set goal position to the currently active goal being navigated to
-}
-
-
 // setter for goals
 void Robot::RobotController::setGoals(geometry_msgs::msg::PoseArray goals)
 {
@@ -1326,6 +1317,27 @@ int Robot::RobotController::getBattery()
     std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
     return feedbackData_.battery;
+}
+
+
+// getter for current goal
+geometry_msgs::msg::Point Robot::RobotController::getGoal()
+{
+    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
+    return feedbackData_.currentGoal;
+}
+
+
+// publisher callback that publishes odometry
+geometry_msgs::msg::Point Robot::RobotController::getPosition()
+{
+    std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
+    feedbackData_.currentPosition = getOdometry().pose.pose.position;
+
+    return feedbackData_.currentPosition;
+
 }
 
 
