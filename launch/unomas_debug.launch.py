@@ -19,5 +19,11 @@ def generate_launch_description():
             executable='simulation_extras',
             output='screen',
             parameters=[{'size': 20, 'resolution': 4.0}]
+        ),
+        Node(
+            package='unomas',
+            executable='robot',
+            output='screen',
+            parameters=[{'serial_id': 'RobotDebug1'}]
         )
     ])

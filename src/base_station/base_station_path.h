@@ -10,11 +10,15 @@ namespace BaseStation
         public:
             BaseStationPath(std::string station_name, const std::shared_ptr<rclcpp::Node>& node);
             ~BaseStationPath();
+
+            void updateStoredRobots(std::vector<std::string> robots_);
         
         private:
             const std::shared_ptr<rclcpp::Node>& node_;
             std::string station_name_;
 
+            std::vector<std::string> stored_robots_;
+            
     };
 }
 

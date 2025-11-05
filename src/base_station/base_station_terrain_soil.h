@@ -25,11 +25,6 @@ namespace BaseStation
 
             rclcpp::Publisher<unomas::msg::SoilInfo>::SharedPtr soil_info_publisher_;
 
-            rclcpp::Service<unomas::srv::TerrainSoilData>::SharedPtr terrain_soil_service_;
-            void terrainSoilServiceCallback(
-                const std::shared_ptr<unomas::srv::TerrainSoilData::Request> request,
-                std::shared_ptr<unomas::srv::TerrainSoilData::Response> response
-            );
     };
 }
 
