@@ -18,6 +18,8 @@ find_package(grid_map_core REQUIRED)
 
 find_package(rclcpp REQUIRED)
 
+find_package(sensor_msgs REQUIRED)
+
 
 # custom messages
 find_package(rosidl_default_generators REQUIRED)
@@ -77,19 +79,20 @@ ament_target_dependencies(simulation_extras
   grid_map_core
 )
 
-#add_executable(robot
-#  src/robot/robot_main.cpp
-#  src/robot/robot_controller.cpp
-#  src/robot/robot_uplink.cpp
-#)
-#target_link_libraries(robot
-#  ${custom_messages}
-#)
-#ament_target_dependencies(robot
-#  rclcpp
-#  geometry_msgs
-#  nav_msgs
-#)
+add_executable(robot
+  src/robot/robot_main.cpp
+  src/robot/robot_controller.cpp
+  src/robot/robot_uplink.cpp
+)
+target_link_libraries(robot
+  ${custom_messages}
+)
+ament_target_dependencies(robot
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+)
 
 #install executables to lib
 install(
@@ -97,7 +100,7 @@ install(
     base_station
     ui_bridge
     simulation_extras
-#    robot
+    robot
   DESTINATION lib/${PROJECT_NAME}
 )
 

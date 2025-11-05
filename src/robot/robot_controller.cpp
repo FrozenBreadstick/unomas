@@ -12,7 +12,7 @@
 */
 
 // clock for loop checking
-using clock = std::chrono::steady_clock;  
+using robotClock = std::chrono::steady_clock;
 using namespace std::chrono_literals;     
 
 //-------------------  CONSTRUCTOR AND DESTRUCTOR  -------------------//
@@ -20,11 +20,7 @@ using namespace std::chrono_literals;
 Robot::RobotController::RobotController(std::string serial_id, const std::shared_ptr<rclcpp::Node>& node) : 
     serial_id_(serial_id), 
     node_(node),
-    feedbackData_.emergency(false),
-    feedbackData_.battery(100),
-    feedbackData_.state("IDLE"),
-    registered_station_(""),
-    stateData_.superState(IDLE),
+    registered_station_("")
 {
 
     // std::string cmd_topic = "/cmd_vel"; //In a multi robot setup this would be combined with serial_id as a prefix
@@ -43,7 +39,12 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     feedbackData_.noGoal.y = 0;
     feedbackData_.noGoal.z = -1;
 
+    feedbackData_.emergency = false;
+    feedbackData_.battery = 100;
+    feedbackData_.state = "IDLE";
     feedbackData_.currentGoal = feedbackData_.noGoal;
+
+    stateData_.superState = State::IDLE;
 
     // set loop rate
     const double loop_rate_hz = 10.0;   // run loop 10 times per second
@@ -74,8 +75,8 @@ Robot::RobotController::RobotController(std::string serial_id, const std::shared
     // initialise subscribers
     std::string goals_topic = "/goals";
     goalsSub_ = node_->create_subscription<geometry_msgs::msg::PoseArray>(goals_topic, 10, std::bind(&Robot::RobotController::subscribeGoals, this, std::placeholders::_1));
-    std::string obstacles_topic = "/obstacles";
-    obstaclesSub_ = node_->create_subscription<custom_msgs::Obstacles>(obstacles_topic, 10, std::bind(&Robot::RobotController::subscribeObstacles, this, std::placeholders::_1));
+    //std::string obstacles_topic = "/obstacles";
+    //obstaclesSub_ = node_->create_subscription<custom_msgs::Obstacles>(obstacles_topic, 10, std::bind(&Robot::RobotController::subscribeObstacles, this, std::placeholders::_1));
     std::string groundLiDAR_topic = "/laserscan2";
     groundLiDARSub_ = node_->create_subscription<sensor_msgs::msg::LaserScan>(groundLiDAR_topic, 10, std::bind(&Robot::RobotController::subscribeGroundLiDAR, this, std::placeholders::_1));
     std::string odom_topic = "/odometry/filtered"; //Filtered uses the IMU to correct drift (better for NAV2)
@@ -288,15 +289,15 @@ void Robot::RobotController::publishNavGoals(geometry_msgs::msg::PoseStamped goa
 
 // This whole subscriber needs fixing
 // subscriber callback that listens for obstacles from detection node
-void Robot::RobotController::subscribeObstacles(geometry_msgs::msg::PoseArray obstacles)
-{
-    // lock mutex and save data
-    {
-    std::lock_guard<std::mutex> lock(objects_.objectMutex);
+// void Robot::RobotController::subscribeObstacles(geometry_msgs::msg::PoseArray obstacles)
+// {
+//     // lock mutex and save data
+//     {
+//     std::lock_guard<std::mutex> lock(objects_.objectMutex);
     
-    objects_.objectPoints = obstacles.poses;
-    }
-}
+//     objects_.objectPoints = obstacles.poses;
+//     }
+// }
 
 
 // subscriber callback that listens for ground LiDAR
@@ -364,7 +365,7 @@ void Robot::RobotController::navThread()
         {
 
             // clock loop start
-            auto loop_start = clock::now();
+            auto loop_start = robotClock::now();
 
             // local copy of odometry               
             dronePose_ = RobotController::getOdometry();
@@ -1068,7 +1069,7 @@ void Robot::RobotController::navThread()
             }
         
             // clock loop end
-            auto loop_end = clock::now();
+            auto loop_end = robotClock::now();
             auto elapsed = loop_end - loop_start;
             auto sleep_time = loop_period - elapsed;
 
@@ -1522,4 +1523,3 @@ void Robot::RobotController::querySoil()
         );
     }
 }
-
