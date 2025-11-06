@@ -132,9 +132,9 @@ def generate_launch_description():
                               'unomas_debug.launch.py']),
         launch_arguments={
             'station_name' : "OldMate",
-            'size' : 150,
+            'size' : '150',
             'robot_name' : 'Fella'
-        }
+        }.items()
     )
     ld.add_action(start_nodes)
 

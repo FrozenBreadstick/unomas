@@ -126,15 +126,16 @@ def generate_launch_description():
     )
     ld.add_action(nav2)
 
+    # Start base station nodes and UI bridge so the web UI can talk to this launch
     start_nodes = IncludeLaunchDescription(
         PathJoinSubstitution([pkg_path,
                               'launch',
                               'unomas_debug.launch.py']),
         launch_arguments={
-            'station_name' : "OldMate",
-            'size' : 150,
-            'robot_name' : 'Fella'
-        }
+            'station_name': 'OldMate',
+            'size': '150',
+            'robot_name': 'Fella'
+        }.items()
     )
     ld.add_action(start_nodes)
 
