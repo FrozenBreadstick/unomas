@@ -126,4 +126,16 @@ def generate_launch_description():
     )
     ld.add_action(nav2)
 
+    start_nodes = IncludeLaunchDescription(
+        PathJoinSubstitution([pkg_path,
+                              'launch',
+                              'unomas_debug.launch.py']),
+        launch_arguments={
+            'station_name' : "OldMate",
+            'size' : 150,
+            'robot_name' : 'Fella'
+        }
+    )
+    ld.add_action(start_nodes)
+
     return ld

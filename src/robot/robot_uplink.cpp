@@ -50,11 +50,11 @@ void Robot::RobotUplink::initialise()
 
 void Robot::RobotUplink::goalCallback(const unomas::msg::AddressedPoseArray::SharedPtr msg)
 {
-    if (msg->address != serial_id_)
-    {
-        RCLCPP_WARN(this->get_logger(), "Received goals intended for '%s', but this robot's serial ID is '%s'. Ignoring.", msg->address.c_str(), serial_id_.c_str());
-        return;
-    }
+    // if (msg->address != serial_id_)
+    // {
+    //     RCLCPP_WARN(this->get_logger(), "Received goals intended for '%s', but this robot's serial ID is '%s'. Ignoring.", msg->address.c_str(), serial_id_.c_str());
+    //     return;
+    // }
     // std::vector<geometry_msgs::msg::Point> goals;
     // for (const auto& pose : msg->poses) {
     //     goals.push_back(pose.position);
@@ -77,7 +77,7 @@ void Robot::RobotUplink::UplinkTimerCallback()
     else if(!registered_)
     {
         register_serial_publisher_ = this->create_publisher<std_msgs::msg::String>(
-            registered_station_ + "/Registrar", 10);
+            registered_station_ + "/Registrar", 100);
         RCLCPP_INFO(this->get_logger(), "Registered with base station: '%s'", registered_station_.c_str());
         registered_ = true;
         register_serial_publisher_->publish(std_msgs::msg::String().set__data(serial_id_));
@@ -107,7 +107,7 @@ void Robot::RobotUplink::registerReceiverCallback(const unomas::msg::StrStr::Sha
         RCLCPP_INFO(this->get_logger(), "Received registration confirmation from base station: '%s'", registered_station_.c_str());
         
         goal_subscriber_ = this->create_subscription<unomas::msg::AddressedPoseArray>(
-            registered_station_ + "/goals", 10, std::bind(&Robot::RobotUplink::goalCallback, this, std::placeholders::_1));
+            /*registered_station_ + "/goals"*/"uplink_goals", 10, std::bind(&Robot::RobotUplink::goalCallback, this, std::placeholders::_1));
 
         std::string emergency_topic = registered_station_ + "/Status/Emergency";
         std::string battery_topic = registered_station_ + "/Status/Battery";
