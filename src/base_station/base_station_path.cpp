@@ -197,7 +197,10 @@ unomas::msg::AddressedPoseArray BaseStation::BaseStationPath::computeShortestRou
     if (nodes.empty())
     {
         RCLCPP_WARN(node_->get_logger(), "No usable route geometry available.");
-        return {};
+
+        unomas::msg::AddressedPoseArray goals;
+
+        return goals;
     }
 
     struct Target
@@ -239,7 +242,10 @@ unomas::msg::AddressedPoseArray BaseStation::BaseStationPath::computeShortestRou
     if (targets.empty())
     {
         RCLCPP_WARN(node_->get_logger(), "No enabled fields could be matched to route waypoints.");
-        return {};
+
+        unomas::msg::AddressedPoseArray goals;
+
+        return goals;
     }
 
     const std::size_t route_node_count = nodes.size();
@@ -384,7 +390,10 @@ unomas::msg::AddressedPoseArray BaseStation::BaseStationPath::computeShortestRou
     if (final_nodes.empty())
     {
         RCLCPP_WARN(node_->get_logger(), "Generated path is empty.");
-        return {};
+        
+        unomas::msg::AddressedPoseArray goals;
+
+        return goals;
     }
 
     if (!final_nodes.empty() && final_nodes.front() == start_idx)
@@ -396,7 +405,10 @@ unomas::msg::AddressedPoseArray BaseStation::BaseStationPath::computeShortestRou
     if (final_nodes.empty())
     {
         RCLCPP_WARN(node_->get_logger(), "Final path contained only the start position.");
-        return {};
+        
+        unomas::msg::AddressedPoseArray goals;
+
+        return goals;
     }
 
     unomas::msg::AddressedPoseArray goals;

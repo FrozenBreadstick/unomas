@@ -31,9 +31,6 @@ Robot::RobotUplink::RobotUplink(std::string serial_id) :
     register_serial_publisher_ = this->create_publisher<std_msgs::msg::String>(
         "Registrar", 10);
 
-    // create controller    
-    initialise();
-
     // emergency_publisher_ = this->create_publisher<std_msgs::msg::Bool>("emergency", 10);
     // battery_publisher_ = this->create_publisher<std_msgs::msg::Int32>("battery", 10);
     // position_publisher_ = this->create_publisher<geometry_msgs::msg::Point>("current_position", 10);
