@@ -65,7 +65,8 @@ void Robot::RobotUplink::goalCallback(const unomas::msg::AddressedPoseArray::Sha
 
     controller_->setGoals(goals_msg);
     RCLCPP_INFO(this->get_logger(), "Received %zu goals for robot '%s'.", goals_msg.poses.size(), serial_id_.c_str());
-    controller_->autoNavigate();
+    bool success = controller_->autoNavigate();
+    RCLCPP_INFO(this->get_logger(), "Fella HEHEHEHA Success: %s", success ? "true" : "false");
 }
 
 void Robot::RobotUplink::UplinkTimerCallback()
