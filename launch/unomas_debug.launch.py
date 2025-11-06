@@ -18,7 +18,7 @@ def generate_launch_description():
 
     simulation_size_arg = DeclareLaunchArgument(
         'size',
-        default_value=150,
+        default_value='150',
         description='Size of the simulation area (in meters)'
     )
     ld.add_action(simulation_size_arg)
@@ -66,5 +66,4 @@ def generate_launch_description():
     ld.add_action(robot_node)
 
     return ld
-
 
