@@ -16,7 +16,7 @@ Simulation::SimulationExtra::SimulationExtra(int size)
         std::bind(&SimulationExtra::soilQueryServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     soil_debug_service_ = this->create_service<unomas::srv::QuerySoil>(
-        "query_soil",
+        "debug_query_soil",
         std::bind(&SimulationExtra::soilDebugServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     soil_debug_publisher_ = this->create_publisher<unomas::msg::SoilInfo>("unomas/SoilUpdatePacket", 10);
