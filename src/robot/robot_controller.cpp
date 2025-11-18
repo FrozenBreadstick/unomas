@@ -277,11 +277,11 @@ void Robot::RobotController::publishNavGoals(geometry_msgs::msg::Pose goal)
     geometry_msgs::msg::PoseStamped msg;
 
     msg.header.stamp = node_->now();
-    msg.header.frame_id = "/world";
+    msg.header.frame_id = "map";
     msg.pose = goal;
 
     // log message
-    RCLCPP_INFO(node_->get_logger(), "Publishing Nav goal (%.2f, %.2f)", msg.pose.position.x, msg.pose.position.y);
+    RCLCPP_INFO(node_->get_logger(), "Fella HEHEHEHA Publishing Nav goal (%.2f, %.2f)", msg.pose.position.x, msg.pose.position.y);
 
     // publish message
     navPub_->publish(msg);
@@ -411,6 +411,12 @@ void Robot::RobotController::navThread()
                                     // set goal
                                     goals_.currentGoal = goals_.droneGoals.poses.at(0);
                                     goals_.commuting = true;
+
+                                    // set feedback goal
+                                    {
+                                        std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+                                        feedbackData_.currentGoal = goals_.currentGoal.position;
+                                    }
 
                                     /* ...Publish goal to nav2... */
                                     publishNavGoals(goals_.currentGoal);
@@ -1272,13 +1278,10 @@ void Robot::RobotController::setGoals(geometry_msgs::msg::PoseArray goals)
         if(threadData_.threadExists == false) {
             threadData_.navThread = new std::thread(&Robot::RobotController::navThread, this);
             threadData_.threadExists = true;
-        }
-        else {
-            //lock state mutex and set state to travelling
+
             {
                 std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
-                stateData_.navDone = false;
                 stateData_.superState = State::TRAVELLING;
                 stateData_.changedState = true;
             }
@@ -1286,8 +1289,30 @@ void Robot::RobotController::setGoals(geometry_msgs::msg::PoseArray goals)
             {
                 std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
 
-                feedbackData_.state = "TRAVELLING";
+                feedbackData_.state = "TRAVELING";
             }
+
+
+            // log new nav thread
+            // RCLCPP_INFO(node_->get_logger(), "Fella HEHEHEHA New nav thread");
+        }
+        else {
+            //lock state mutex and set state to travelling
+            {
+                std::lock_guard<std::mutex> lock(stateData_.stateMutex);
+
+                stateData_.superState = State::TRAVELLING;
+                stateData_.changedState = true;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(feedbackData_.feedbackMutex);
+
+                feedbackData_.state = "TRAVELING";
+            }
+
+            // log goals succeeded
+            // RCLCPP_INFO(node_->get_logger(), "Fella HEHEHEHA Goals succeeded");
         }
     }
 }
@@ -1648,16 +1673,7 @@ bool Robot::RobotController::autoNavigate()
 
             std::lock_guard<std::mutex> lock(stateData_.stateMutex);
 
-            //if nav thread is not running
-            if(stateData_.navDone == false) {
-
-                stateData_.navDone = true;
-
-            }
-            else {
-
-                return false;
-            }
+            stateData_.navDone = true;
 
         }
         else {
